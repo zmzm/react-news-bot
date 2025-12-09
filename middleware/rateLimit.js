@@ -2,7 +2,10 @@ const rateLimiter = require("../utils/rateLimiter");
 
 /**
  * Rate limiting middleware factory
- * @returns {Function} - Middleware function
+ * Creates middleware that enforces rate limits per user
+ * Uses in-memory rate limiter with configurable window and max requests
+ * 
+ * @returns {Function} - Telegraf middleware function
  */
 function rateLimitMiddleware() {
   return async (ctx, next) => {

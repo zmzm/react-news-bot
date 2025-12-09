@@ -3,6 +3,10 @@ const { ALLOWED_DOMAINS } = require("../config/constants");
 /**
  * Strict validation for article URLs (prevents SSRF)
  * Only allows thisweekinreact.com domain
+ * 
+ * @param {string} url - URL to validate
+ * @returns {string} - Validated URL string
+ * @throws {Error} - If URL is invalid or not allowed
  */
 function validateArticleUrl(url) {
   try {
@@ -34,6 +38,11 @@ function validateArticleUrl(url) {
 /**
  * Permissive validation for nested links in articles
  * Allows external domains but enforces HTTPS and basic security
+ * Blocks localhost and private IP ranges
+ * 
+ * @param {string} url - URL to validate
+ * @returns {string} - Validated URL string
+ * @throws {Error} - If URL is invalid or contains blocked domains
  */
 function validateNestedUrl(url) {
   try {

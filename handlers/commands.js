@@ -2,16 +2,21 @@ const telegramService = require("../services/telegramService");
 const articleService = require("../services/articleService");
 const { isAuthorized } = require("../middleware/auth");
 const rateLimitMiddleware = require("../middleware/rateLimit");
+const { validateArticleNumber, parseCommandArgs } = require("../utils/validators");
 
 /**
- * Register all bot commands
+ * Register all bot commands with their middleware and handlers
+ * 
+ * Commands:
+ * - /start - Welcome message (no middleware)
+ * - /now - Manual check for new articles (auth + rate limit)
+ * - /article <number> - Fetch specific article (rate limit)
  */
 function registerCommands() {
   const bot = telegramService.getBot();
 
   // /start command
   bot.start(async (ctx) => {
-    console.log(ctx.telegram)
     await ctx.reply(
       "Hi! I'll send you the React section from This Week In React every Thursday 🔥"
     );
@@ -32,26 +37,22 @@ function registerCommands() {
 
   // /article command - get specific article by number
   bot.command("article", rateLimitMiddleware(), async (ctx) => {
-    // Get article number from command arguments
-    const args = ctx.message.text.split(/\s+/);
-    if (args.length < 2) {
+    const args = parseCommandArgs(ctx.message.text);
+    
+    if (args.length < 1) {
       await ctx.reply("Usage: /article <number>\nExample: /article 260");
       return;
     }
 
-    const articleNumber = parseInt(args[1], 10);
-
-    // Validate article number
-    if (
-      isNaN(articleNumber) ||
-      !Number.isInteger(articleNumber) ||
-      articleNumber < 1
-    ) {
+    const validation = validateArticleNumber(args[0]);
+    if (!validation.valid) {
       await ctx.reply(
-        "❌ Invalid article number. Please provide a positive integer.\nExample: /article 260"
+        `❌ ${validation.error}\n\nExample: /article 260`
       );
       return;
     }
+
+    const articleNumber = validation.value;
 
     try {
       await ctx.reply(`Fetching article #${articleNumber}, please wait…`);

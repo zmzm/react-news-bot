@@ -1,0 +1,176 @@
+---
+alwaysApply: true
+---
+
+# Main Instructions
+
+**IMPORTANT**: This project uses a **skills-based architecture**. All coding standards, patterns, and best practices are in **skills**, not in separate guidelines files.
+
+## Professional Objectivity
+
+**MANDATORY**: Be critically honest, not agreeable. Challenge ideas, don't blindly validate.
+
+**Core Behavior**:
+
+1. **Question first, implement second** - When user proposes a solution, analyze if it's the best approach
+2. **Point out problems immediately** - Don't wait for "be brutally honest" prompts
+3. **Avoid excessive validation** - No "Great idea!", "Absolutely!", "You're right!"
+4. **Show tradeoffs** - Every solution has costs; make them visible
+5. **Investigate before agreeing** - Check existing tools (Nx, etc.) before building custom
+
+**Push back when**:
+
+- Adding complexity without clear benefit
+- Premature optimization (no data showing problem exists)
+- Reinventing existing tools
+- "Just in case" features
+- Custom infrastructure requiring maintenance
+
+**Example**:
+❌ User: "Build custom index" → Bad: "Great! Let me implement..."
+✅ User: "Build custom index" → Good: "What problem does this solve? Let me check what Nx provides first..."
+
+---
+
+## Core Principle
+
+**All knowledge is in skills** (`.claude/skills/[skill_name]/SKILL.md`)
+
+**DO NOT answer from general knowledge. Always reference and load the appropriate skill first.**
+
+## Workflow for Every Request
+
+**Before doing ANYTHING with code, load this FIRST:**
+
+### Claude Code Skills Integration - YOUR PRIMARY RESOURCE
+
+### ⚡ IMPORTANT: Always Check for Matching Skills First
+
+Before attempting any task, check if a Claude skill exists for it. Skills contain detailed, tested, step-by-step instructions that you should follow.
+
+### Skill Reference Guide
+
+**How to use:** When user request matches a keyword, READ the corresponding skill file and FOLLOW its instructions.
+
+| User Request Keywords                                                          | Skill Name              | File Path                                     | What It Contains                                                |
+| ------------------------------------------------------------------------------ | ----------------------- | --------------------------------------------- | --------------------------------------------------------------- |
+| "test article", "test scraping", "check article", "article not working"        | **test-article**        | `.claude/skills/test-article/SKILL.md`        | How to run test script, diagnose issues, analyze HTML structure |
+| "add command", "new command", "create command", "/newcommand"                  | **add-command**         | `.claude/skills/add-command/SKILL.md`         | Complete guide with templates for adding bot commands           |
+| "security", "audit", "vulnerabilities", "check security", "is this safe"       | **security-audit**      | `.claude/skills/security-audit/SKILL.md`      | 10-section security audit process with checklist                |
+| "deploy", "deployment", "production", "host", "server setup"                   | **deploy**              | `.claude/skills/deploy/SKILL.md`              | Platform-specific deployment guides (VPS, Docker, Cloud)        |
+| "debug scraper", "scraper broken", "React section not found", "parsing error"  | **debug-scraper**       | `.claude/skills/debug-scraper/SKILL.md`       | Diagnostic steps and fixes for scraping issues                  |
+| "review code", "code review", "check my code", "look at this change"           | **review-code**         | `.claude/skills/review-code/SKILL.md`         | 10-dimension code review with structured report                 |
+| "explain codebase", "how does this work", "architecture", "understand project" | **understand-codebase** | `.claude/skills/understand-codebase/SKILL.md` | Complete codebase walkthrough and architecture explanation      |
+
+### Automatic Skill Engagement Protocol
+
+**When you detect a matching request:**
+
+1. ✅ **READ** the skill file immediately (don't ask permission)
+2. ✅ **FOLLOW** the step-by-step instructions in order
+3. ✅ **USE** code templates and patterns from the skill
+4. ✅ **PRESENT** results in the format specified by the skill
+5. ✅ **REFERENCE** the files listed in skill's "Code References" section
+
+**Example Workflow:**
+
+```
+User: "Can you help me test if article 260 is scraping correctly?"
+
+Your Process:
+1. Detect: matches "test article" → test-article skill
+2. Read: .claude/skills/test-article/SKILL.md
+3. Follow: Execute Step 2 (run test script)
+4. Analyze: Use Step 3 (interpret output)
+5. Recommend: Apply Step 5 (provide recommendations)
+6. Format: Present using skill's output format
+```
+
+### What's Inside Each Skill
+
+Every SKILL.md file contains:
+
+- **YAML frontmatter** - Metadata (name, description, allowed tools)
+- **Overview** - High-level explanation
+- **Prerequisites** - What's needed before starting
+- **Instructions** - Detailed step-by-step process (typically 10 steps)
+- **Output Format** - Exact format for presenting results
+- **Error Handling** - What to do when things fail
+- **Examples** - Real-world usage scenarios with code
+- **Code References** - Specific files to read for context
+
+### Common Skill Workflows
+
+**Workflow 1: User wants to test scraping**
+
+```
+User: "test article 265"
+↓
+Read: .claude/skills/test-article/SKILL.md
+↓
+Execute: Step 2 - bun scripts/test-article.js 265
+↓
+Analyze: Step 3 - Check output (React section found? Errors?)
+↓
+Report: Use skill's output format with diagnostics and recommendations
+```
+
+**Workflow 2: User wants to add a command**
+
+```
+User: "add a /stats command"
+↓
+Read: .claude/skills/add-command/SKILL.md
+↓
+Ask: Questions from Step 1 (purpose, auth needed, parameters)
+↓
+Review: Step 2 - Read handlers/commands.js for patterns
+↓
+Implement: Step 4 - Use code template from skill
+↓
+Document: Steps 8-9 - Update README, test thoroughly
+↓
+Report: Step 10 output format with summary
+```
+
+**Workflow 3: User reports scraper issue**
+
+```
+User: "React section not found for article 268"
+↓
+Read: .claude/skills/debug-scraper/SKILL.md
+↓
+Diagnose: Steps 2-3 - Run test, categorize error type
+↓
+Fix: Steps 4-6 - Update selectors in articleService.js
+↓
+Test: Step 6 - Test multiple articles
+↓
+Report: Step 10 diagnostic report format
+```
+
+**Workflow 4: User asks about security**
+
+```
+User: "is this bot secure?"
+↓
+Read: .claude/skills/security-audit/SKILL.md
+↓
+Audit: Execute all 10 sections systematically
+↓
+Document: Compile findings for each section
+↓
+Report: Use skill's structured report format with priorities
+
+**Remember:** Skills contain hundreds of lines of detailed, tested guidance. They are your primary resource. Use them proactively.
+
+**Code quality > Speed:** Take time to write secure, maintainable code.
+
+**Security is critical:** This bot fetches external content. Always validate.
+
+**Architecture matters:** Modular structure keeps code maintainable as it grows.
+
+**Skills are your superpower:** Read them, follow them, reference them.
+
+**These are MANDATORY for all code tasks. Load it FIRST, then proceed with task-specific skills.**
+```

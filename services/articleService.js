@@ -1,6 +1,7 @@
 const { validateArticleUrl, validateNestedUrl } = require("../utils/urlValidator");
 const { MAX_TITLE_LENGTH, MAX_MESSAGE_LENGTH } = require("../config/constants");
 const scraper = require("./scraper");
+const { ParsingError, NotFoundError, ValidationError, NetworkError } = require("../utils/errors");
 
 class ArticleService {
   /**
@@ -27,13 +28,13 @@ class ArticleService {
       );
 
       if (isSpecialArticle) {
-        throw new Error(
+        throw new ParsingError(
           "This article is a special announcement and doesn't contain a React section. " +
           "It may be about a launch, update, or other special content."
         );
       }
 
-      throw new Error(
+      throw new ParsingError(
         "React section not found in the article. " +
         "This article might have a different structure or may not contain React-related content."
       );
@@ -285,28 +286,33 @@ class ArticleService {
       const text = await this.getReactSectionText(articleUrl);
       return this.truncateMessage(text);
     } catch (err) {
-      // Handle HTTP errors
+      // Re-throw custom errors as-is
+      if (err instanceof ParsingError || err instanceof NotFoundError || 
+          err instanceof ValidationError || err instanceof NetworkError) {
+        throw err;
+      }
+
+      // Handle HTTP errors (from axios)
       if (err.response) {
         const status = err.response.status;
         if (status === 404) {
-          throw new Error(`Article #${articleNumber} not found (404)`);
+          throw new NotFoundError(`Article #${articleNumber} not found (404)`);
         }
-        throw new Error(`HTTP ${status} error fetching article #${articleNumber}: ${err.message}`);
+        throw new NetworkError(
+          `HTTP ${status} error fetching article #${articleNumber}: ${err.message}`,
+          "HTTP_ERROR",
+          status
+        );
       }
 
       // Handle network errors
       if (err.code === "ECONNREFUSED" || err.code === "ETIMEDOUT" || err.code === "ENOTFOUND") {
-        throw new Error(`Network error fetching article #${articleNumber}: ${err.message}`);
-      }
-
-      // Handle parsing errors
-      if (err.message.includes("React section not found")) {
-        throw new Error(`Article #${articleNumber} exists but React section not found. The article might have a different structure.`);
+        throw new NetworkError(`Network error fetching article #${articleNumber}: ${err.message}`, err.code);
       }
 
       // Handle URL validation errors
       if (err.message.includes("Invalid URL") || err.message.includes("not allowed")) {
-        throw new Error(`Invalid URL for article #${articleNumber}: ${err.message}`);
+        throw new ValidationError(`Invalid URL for article #${articleNumber}: ${err.message}`);
       }
 
       // Generic error with original message

@@ -4,7 +4,14 @@ const articleService = require("./articleService");
 const scraper = require("./scraper");
 const stateManager = require("../utils/stateManager");
 
+/**
+ * Telegram bot service
+ * Manages bot instance, message sending, and article checking
+ */
 class TelegramService {
+  /**
+   * Initialize Telegram bot service
+   */
   constructor() {
     this.bot = new Telegraf(BOT_TOKEN);
     this.chatId = CHAT_ID;

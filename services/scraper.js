@@ -2,6 +2,7 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const { HTTP_TIMEOUT, MAX_RESPONSE_SIZE } = require("../config/constants");
 const { validateArticleUrl } = require("../utils/urlValidator");
+const { handleAxiosError, NetworkError } = require("../utils/errors");
 
 // HTTP client configuration
 const axiosConfig = {
@@ -23,16 +24,21 @@ class Scraper {
       const res = await axios.get(validatedUrl, axiosConfig);
       
       if (!res.data) {
-        throw new Error("Empty response from server");
+        throw new NetworkError("Empty response from server");
       }
       
       return cheerio.load(res.data);
     } catch (err) {
-      // Re-throw with more context
-      if (err.response) {
-        throw new Error(`HTTP ${err.response.status}: ${err.response.statusText}`);
+      // Convert axios errors to application errors
+      if (err.response || err.code) {
+        throw handleAxiosError(err, "Fetching article");
       }
-      throw err;
+      // Re-throw validation errors as-is
+      if (err.code === "VALIDATION_ERROR" || err.code === "NOT_FOUND") {
+        throw err;
+      }
+      // Wrap other errors
+      throw new NetworkError(`Failed to fetch article: ${err.message}`);
     }
   }
 

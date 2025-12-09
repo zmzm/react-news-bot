@@ -1,0 +1,25 @@
+#!/bin/bash
+# Hook: user-prompt-submit
+# Validates environment before processing user requests
+
+# Check if .env file exists
+if [ ! -f .env ]; then
+  echo "⚠️  Warning: .env file not found. Bot credentials may be missing."
+  echo "💡 Tip: Copy .env.example to .env and add your BOT_TOKEN and TELEGRAM_CHAT_ID"
+fi
+
+# Check if .env has required variables (only if file exists)
+if [ -f .env ]; then
+  if ! grep -q "BOT_TOKEN=" .env || ! grep -q "TELEGRAM_CHAT_ID=" .env; then
+    echo "⚠️  Warning: .env file exists but may be missing required variables"
+    echo "📝 Required: BOT_TOKEN and TELEGRAM_CHAT_ID"
+  fi
+fi
+
+# Check if node_modules exists
+if [ ! -d node_modules ]; then
+  echo "⚠️  Warning: node_modules not found. Dependencies may not be installed."
+  echo "💡 Run: bun install (or npm install)"
+fi
+
+exit 0

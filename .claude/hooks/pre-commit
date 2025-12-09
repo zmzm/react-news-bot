@@ -1,0 +1,36 @@
+#!/bin/bash
+# Hook: pre-commit
+# Runs security and quality checks before committing
+
+echo "🔍 Running pre-commit checks..."
+
+# Check for accidentally committed secrets
+if git diff --cached --name-only | grep -q "^\.env$"; then
+  echo "❌ ERROR: Attempting to commit .env file!"
+  echo "💡 The .env file contains secrets and should not be committed."
+  exit 1
+fi
+
+# Check for hardcoded tokens in staged files
+if git diff --cached | grep -iE "(bot_token|telegram.*token|api.*key|secret)" | grep -v "BOT_TOKEN=" | grep -q "="; then
+  echo "⚠️  WARNING: Possible hardcoded credentials detected in staged changes"
+  echo "Please review your changes to ensure no secrets are being committed"
+  echo ""
+  git diff --cached | grep -iE "(bot_token|telegram.*token|api.*key|secret)" | head -5
+  echo ""
+  echo "❓ Do you want to continue with the commit? (Ctrl+C to cancel)"
+  read -p "Type 'yes' to continue: " response
+  if [ "$response" != "yes" ]; then
+    exit 1
+  fi
+fi
+
+# Check for console.log statements in production code (warning only)
+console_logs=$(git diff --cached --name-only | grep "\.js$" | xargs git diff --cached | grep "^\+.*console\.log" | wc -l)
+if [ "$console_logs" -gt 0 ]; then
+  echo "ℹ️  Info: Found $console_logs new console.log statement(s) in staged files"
+  echo "   Consider using proper logging or removing debug statements"
+fi
+
+echo "✅ Pre-commit checks passed"
+exit 0

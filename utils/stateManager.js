@@ -1,10 +1,14 @@
 const fsPromises = require("fs").promises;
 const { STATE_FILE } = require("../config/constants");
 
+/**
+ * State manager for bot state persistence
+ * Handles atomic file operations for tracking last sent article
+ */
 class StateManager {
   /**
    * Load state from file
-   * @returns {Promise<{lastArticle: number}>}
+   * @returns {Promise<{lastArticle: number}>} - State object with lastArticle number
    */
   async load() {
     try {

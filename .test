@@ -1,0 +1,592 @@
+# Cursor AI Instructions for This Week In React Bot
+
+This document provides comprehensive instructions for Cursor AI when working on the This Week In React Telegram bot project.
+
+## Quick Reference: How to Use This File
+
+**When user asks you to do something:**
+
+1. Check if it matches a Claude skill (see "Skill Reference Guide" below)
+2. If yes → Read the corresponding `.claude/skills/<skill-name>/SKILL.md` file
+3. Follow that skill's step-by-step instructions
+4. Use templates and patterns from the skill
+5. Present output in the skill's format
+
+**Common patterns:** If user mentions "test article" → read test-article skill | "add command" → read add-command skill | "security" → read security-audit skill
+
+---
+
+## Project Overview
+
+### Purpose
+
+This is a Telegram bot that automatically fetches and sends the React section from "This Week In React" newsletter every Thursday at 10:00 AM. Users can also manually fetch specific articles by number using commands.
+
+### Tech Stack
+
+- **Runtime:** Bun (recommended) or Node.js
+- **Bot Framework:** Telegraf (Telegram bot library)
+- **HTTP Client:** Axios (for fetching web content)
+- **HTML Parser:** Cheerio (jQuery-like HTML parsing)
+- **Scheduler:** node-cron (for scheduled tasks)
+- **Environment:** dotenv (environment variable management)
+
+### Key Features
+
+1. Automated weekly updates (Thursday 10:00 AM)
+2. Manual article fetching via `/article <number>` command
+3. Security features (rate limiting, URL validation, SSRF protection)
+4. Modular architecture with strict separation of concerns
+5. Hot reload support for development
+
+## Architecture Guidelines
+
+### Directory Structure and Responsibilities
+
+```
+thisweekinreact-bot/
+├── config/              # Configuration and environment validation
+│   ├── env.js          # Environment variable validation and exports
+│   └── constants.js    # Application constants (timeouts, limits, schedules)
+├── services/           # Business logic (singleton pattern)
+│   ├── scraper.js      # HTTP fetching and HTML parsing with Cheerio
+│   ├── articleService.js # Article parsing and Telegram formatting
+│   └── telegramService.js # Bot operations and lifecycle management
+├── handlers/           # Command handlers (thin, delegate to services)
+│   └── commands.js     # All bot command definitions
+├── middleware/         # Bot middleware for cross-cutting concerns
+│   ├── errorHandler.js # Global error handling
+│   ├── auth.js         # Authorization checks
+│   └── rateLimit.js    # Rate limiting middleware factory
+├── utils/              # Utility functions
+│   ├── urlValidator.js # URL validation (CRITICAL for SSRF protection)
+│   ├── rateLimiter.js  # Rate limiter class implementation
+│   └── stateManager.js # State file persistence
+├── scheduler/          # Scheduled tasks
+│   └── cron.js         # Cron job definitions
+├── scripts/            # Utility scripts
+│   └── test-article.js # Test article scraping standalone
+├── .claude/            # Claude Code configuration (skills and hooks)
+│   ├── skills/        # Detailed step-by-step guidance files
+│   │   ├── test-article/SKILL.md
+│   │   ├── add-command/SKILL.md
+│   │   ├── security-audit/SKILL.md
+│   │   ├── deploy/SKILL.md
+│   │   ├── debug-scraper/SKILL.md
+│   │   ├── review-code/SKILL.md
+│   │   └── understand-codebase/SKILL.md
+│   └── hooks/         # Environment validation scripts
+├── docs/               # Documentation
+├── index.js            # Main entry point
+└── state.json          # Bot state (last sent article number)
+```
+
+### CRITICAL Architecture Rules
+
+**1. Strict Separation of Concerns**
+
+- **NEVER** put business logic in command handlers
+- **ALWAYS** delegate to services from handlers
+- Handlers should be thin (typically < 30 lines)
+- Services contain business logic only, no command handling
+
+**2. Module Placement**
+When creating new code:
+
+- Business logic → `services/`
+- Command handlers → `handlers/commands.js`
+- Cross-cutting concerns → `middleware/`
+- Utilities → `utils/`
+- Configuration → `config/`
+- Scheduled tasks → `scheduler/`
+
+**3. Singleton Pattern for Services**
+All services export singleton instances:
+
+```javascript
+class MyService {
+  // methods here
+}
+
+module.exports = new MyService();
+```
+
+**4. Thin Handler Pattern**
+Command handlers follow this structure:
+
+```javascript
+bot.command("name", rateLimitMiddleware(), async (ctx) => {
+  // 1. Validate input
+  // 2. Check authorization (if needed)
+  // 3. Delegate to service
+  // 4. Handle errors
+  // 5. Send response
+});
+```
+
+## Claude Code Skills Integration - YOUR PRIMARY RESOURCE
+
+### ⚡ IMPORTANT: Always Check for Matching Skills First
+
+Before attempting any task, check if a Claude skill exists for it. Skills contain detailed, tested, step-by-step instructions that you should follow.
+
+### Skill Reference Guide
+
+**How to use:** When user request matches a keyword, READ the corresponding skill file and FOLLOW its instructions.
+
+| User Request Keywords                                                          | Skill Name              | File Path                                     | What It Contains                                                |
+| ------------------------------------------------------------------------------ | ----------------------- | --------------------------------------------- | --------------------------------------------------------------- |
+| "test article", "test scraping", "check article", "article not working"        | **test-article**        | `.claude/skills/test-article/SKILL.md`        | How to run test script, diagnose issues, analyze HTML structure |
+| "add command", "new command", "create command", "/newcommand"                  | **add-command**         | `.claude/skills/add-command/SKILL.md`         | Complete guide with templates for adding bot commands           |
+| "security", "audit", "vulnerabilities", "check security", "is this safe"       | **security-audit**      | `.claude/skills/security-audit/SKILL.md`      | 10-section security audit process with checklist                |
+| "deploy", "deployment", "production", "host", "server setup"                   | **deploy**              | `.claude/skills/deploy/SKILL.md`              | Platform-specific deployment guides (VPS, Docker, Cloud)        |
+| "debug scraper", "scraper broken", "React section not found", "parsing error"  | **debug-scraper**       | `.claude/skills/debug-scraper/SKILL.md`       | Diagnostic steps and fixes for scraping issues                  |
+| "review code", "code review", "check my code", "look at this change"           | **review-code**         | `.claude/skills/review-code/SKILL.md`         | 10-dimension code review with structured report                 |
+| "explain codebase", "how does this work", "architecture", "understand project" | **understand-codebase** | `.claude/skills/understand-codebase/SKILL.md` | Complete codebase walkthrough and architecture explanation      |
+
+### Automatic Skill Engagement Protocol
+
+**When you detect a matching request:**
+
+1. ✅ **READ** the skill file immediately (don't ask permission)
+2. ✅ **FOLLOW** the step-by-step instructions in order
+3. ✅ **USE** code templates and patterns from the skill
+4. ✅ **PRESENT** results in the format specified by the skill
+5. ✅ **REFERENCE** the files listed in skill's "Code References" section
+
+**Example Workflow:**
+
+```
+User: "Can you help me test if article 260 is scraping correctly?"
+
+Your Process:
+1. Detect: matches "test article" → test-article skill
+2. Read: .claude/skills/test-article/SKILL.md
+3. Follow: Execute Step 2 (run test script)
+4. Analyze: Use Step 3 (interpret output)
+5. Recommend: Apply Step 5 (provide recommendations)
+6. Format: Present using skill's output format
+```
+
+### What's Inside Each Skill
+
+Every SKILL.md file contains:
+
+- **YAML frontmatter** - Metadata (name, description, allowed tools)
+- **Overview** - High-level explanation
+- **Prerequisites** - What's needed before starting
+- **Instructions** - Detailed step-by-step process (typically 10 steps)
+- **Output Format** - Exact format for presenting results
+- **Error Handling** - What to do when things fail
+- **Examples** - Real-world usage scenarios with code
+- **Code References** - Specific files to read for context
+
+### Common Skill Workflows
+
+**Workflow 1: User wants to test scraping**
+
+```
+User: "test article 265"
+↓
+Read: .claude/skills/test-article/SKILL.md
+↓
+Execute: Step 2 - bun scripts/test-article.js 265
+↓
+Analyze: Step 3 - Check output (React section found? Errors?)
+↓
+Report: Use skill's output format with diagnostics and recommendations
+```
+
+**Workflow 2: User wants to add a command**
+
+```
+User: "add a /stats command"
+↓
+Read: .claude/skills/add-command/SKILL.md
+↓
+Ask: Questions from Step 1 (purpose, auth needed, parameters)
+↓
+Review: Step 2 - Read handlers/commands.js for patterns
+↓
+Implement: Step 4 - Use code template from skill
+↓
+Document: Steps 8-9 - Update README, test thoroughly
+↓
+Report: Step 10 output format with summary
+```
+
+**Workflow 3: User reports scraper issue**
+
+```
+User: "React section not found for article 268"
+↓
+Read: .claude/skills/debug-scraper/SKILL.md
+↓
+Diagnose: Steps 2-3 - Run test, categorize error type
+↓
+Fix: Steps 4-6 - Update selectors in articleService.js
+↓
+Test: Step 6 - Test multiple articles
+↓
+Report: Step 10 diagnostic report format
+```
+
+**Workflow 4: User asks about security**
+
+```
+User: "is this bot secure?"
+↓
+Read: .claude/skills/security-audit/SKILL.md
+↓
+Audit: Execute all 10 sections systematically
+↓
+Document: Compile findings for each section
+↓
+Report: Use skill's structured report format with priorities
+```
+
+## Security Requirements (CRITICAL)
+
+### 1. URL Validation - ALWAYS REQUIRED
+
+**NEVER fetch URLs without validation. This prevents SSRF attacks.**
+
+```javascript
+// CORRECT - Always validate before fetching
+const { validateArticleUrl } = require("./utils/urlValidator");
+const validUrl = validateArticleUrl(url);
+const response = await axios.get(validUrl);
+
+// WRONG - Never do this
+const response = await axios.get(userProvidedUrl); // ❌ SECURITY VULNERABILITY
+```
+
+The URL validator only allows `thisweekinreact.com` domain. This is intentional.
+
+### 2. Input Validation - ALWAYS REQUIRED
+
+Validate ALL user input before use:
+
+```javascript
+// Article number validation example
+const articleNumber = parseInt(args[1], 10);
+if (
+  isNaN(articleNumber) ||
+  !Number.isInteger(articleNumber) ||
+  articleNumber < 1
+) {
+  await ctx.reply("❌ Please provide a valid positive integer");
+  return;
+}
+
+// String validation example
+const text = args.slice(1).join(" ");
+if (!text || text.trim().length === 0) {
+  await ctx.reply("❌ Please provide text after the command");
+  return;
+}
+```
+
+### 3. No Hardcoded Secrets
+
+- All secrets via environment variables in `.env`
+- Validate in `config/env.js`
+- **NEVER** commit `.env` (it's in `.gitignore`)
+- Use `.env.example` as template
+
+### 4. Rate Limiting
+
+Apply to all user-facing commands:
+
+```javascript
+bot.command("name", rateLimitMiddleware(), async (ctx) => {
+  // handler logic
+});
+```
+
+### 5. Authorization
+
+Protect admin commands:
+
+```javascript
+const { isAuthorized } = require("../middleware/auth");
+
+bot.command("admin", rateLimitMiddleware(), async (ctx) => {
+  if (!isAuthorized(ctx)) {
+    await ctx.reply("❌ You don't have permission");
+    return;
+  }
+  // admin logic
+});
+```
+
+### 6. Error Handling
+
+**NEVER expose stack traces to users:**
+
+```javascript
+// CORRECT
+try {
+  const result = await service.doWork();
+  await ctx.reply(result);
+} catch (err) {
+  console.error('Detailed error for logs:', err); // Server-side
+  await ctx.reply('❌ Something went wrong'); // User-friendly
+}
+
+// WRONG
+catch (err) {
+  await ctx.reply(err.stack); // ❌ Exposes sensitive info
+}
+```
+
+## Code Conventions
+
+### Naming Conventions
+
+- **Services:** `camelCase` - `articleService`, `telegramService`
+- **Functions:** `camelCase`, verb-noun - `getArticle`, `checkAndSend`
+- **Constants:** `UPPER_SNAKE_CASE` - `HTTP_TIMEOUT`, `MAX_RESPONSE_SIZE`
+- **Files:** `camelCase.js` - `articleService.js`, `rateLimiter.js`
+- **Variables:** `camelCase` - descriptive names
+
+### Documentation
+
+Add JSDoc comments to all exported functions:
+
+```javascript
+/**
+ * Fetch and parse article by number
+ * @param {number} articleNumber - Article number (must be positive integer)
+ * @returns {Promise<string>} - Formatted article text for Telegram
+ * @throws {Error} - If article not found or parsing fails
+ */
+async getArticle(articleNumber) {
+  // implementation
+}
+```
+
+### Error Handling Pattern
+
+```javascript
+try {
+  // Operation that might fail
+  const result = await riskyOperation();
+  return result;
+} catch (err) {
+  // Log detailed error server-side
+  console.error("Context about what failed:", err.message);
+  console.error("Full error:", err);
+
+  // Throw with user-friendly message or handle gracefully
+  throw new Error("User-friendly description of what went wrong");
+}
+```
+
+### Async/Await
+
+- **ALWAYS** use `async/await` (never raw promises or `.then()`)
+- **ALWAYS** handle rejections with try-catch
+- **NO** floating promises (always await)
+
+## Using Skills for Code Generation
+
+When generating code, leverage skill templates:
+
+### Example: Adding a New Command
+
+**Don't generate from scratch** - Use the skill!
+
+1. **Read** `.claude/skills/add-command/SKILL.md`
+2. **Find** Step 4 "Implement the Command"
+3. **Use** the "Basic Command Pattern" or "Admin-Only Command Pattern" template
+4. **Follow** the complete checklist from Step 10
+
+**The skill provides battle-tested templates** - don't reinvent patterns.
+
+### Example: Creating a Service
+
+1. **Read** `.claude/skills/add-command/SKILL.md`, Step 5
+2. **Copy** the "Service Structure" template
+3. **Follow** singleton pattern as shown
+4. **Add** JSDoc comments like the examples
+
+### Example: Debugging Scraper
+
+1. **Read** `.claude/skills/debug-scraper/SKILL.md`
+2. **Execute** Step 2 diagnostic commands
+3. **Match** error to Issue Types A-D in Step 3
+4. **Apply** corresponding fix from Steps 4-7
+5. **Test** as described in Step 6
+
+## Anti-Patterns to Avoid
+
+### ❌ DON'T DO THIS
+
+```javascript
+// 1. Business logic in handlers
+bot.command('article', async (ctx) => {
+  const html = await axios.get(url); // ❌ Should be in service
+  const $ = cheerio.load(html);
+  const section = $('h2').text(); // ❌ Parsing logic in handler
+});
+
+// 2. Hardcoded values
+const timeout = 10000; // ❌ Should be in config/constants.js
+
+// 3. Unvalidated URLs
+await axios.get(userUrl); // ❌ SECURITY VULNERABILITY
+
+// 4. Missing error handling
+const result = await riskyOperation(); // ❌ No try-catch
+
+// 5. Exposing errors
+catch (err) {
+  await ctx.reply(err.stack); // ❌ Never expose stack traces
+}
+
+// 6. Missing input validation
+const number = parseInt(args[1]); // ❌ No validation
+await service.process(number);
+```
+
+### ✅ DO THIS INSTEAD
+
+```javascript
+// Delegate to services with full error handling
+bot.command("article", rateLimitMiddleware(), async (ctx) => {
+  try {
+    const number = parseInt(args[1], 10);
+    if (isNaN(number) || number < 1) {
+      await ctx.reply("❌ Invalid article number");
+      return;
+    }
+
+    const text = await articleService.getArticle(number);
+    await ctx.reply(text);
+  } catch (err) {
+    console.error("Error:", err);
+    await ctx.reply("❌ Failed to fetch article");
+  }
+});
+```
+
+## Code Review Checklist
+
+Before suggesting code, verify:
+
+- [ ] Follows project architecture (handlers thin, logic in services)
+- [ ] Module placement correct (services/, handlers/, middleware/, etc.)
+- [ ] Input validation present
+- [ ] URL validation for external URLs
+- [ ] Rate limiting applied (if user-facing command)
+- [ ] Authorization checked (if admin command)
+- [ ] Error handling with try-catch
+- [ ] User-friendly error messages (no stack traces)
+- [ ] No hardcoded values (use constants)
+- [ ] JSDoc comments for functions
+- [ ] Async/await used consistently
+- [ ] No floating promises
+- [ ] Follows naming conventions
+- [ ] No security vulnerabilities
+- [ ] **Relevant skill file consulted** (if applicable)
+
+## Development Workflow
+
+### Setup
+
+```bash
+bun install
+cp .env.example .env
+# Edit .env with BOT_TOKEN and TELEGRAM_CHAT_ID
+bun scripts/test-article.js 260  # Test scraping
+bun dev  # Start with hot reload
+```
+
+### Testing
+
+```bash
+# Test specific article
+bun scripts/test-article.js <number>
+
+# Development mode
+bun dev
+
+# Production mode
+bun prod
+```
+
+## Environment Variables
+
+### Required
+
+```bash
+BOT_TOKEN=your_telegram_bot_token_from_botfather
+TELEGRAM_CHAT_ID=your_chat_id_where_bot_sends_messages
+```
+
+### Optional
+
+```bash
+ALLOWED_USER_IDS=comma,separated,user,ids,for,admin,commands
+NODE_ENV=production  # Set to "production" in production
+```
+
+## Important Files Reference
+
+### Must Read Before Changes
+
+- `ARCHITECTURE.md` - Detailed architecture documentation
+- `docs/SECURITY.md` - Security considerations
+- `.claude/README.md` - Skills and hooks documentation
+- `.claude/skills/<skill-name>/SKILL.md` - Task-specific detailed guidance
+- `handlers/commands.js` - Command patterns
+- `services/articleService.js` - Scraping logic (frequently needs updates)
+
+## Quick Skill Command Reference
+
+Use this table to instantly know which skill to reference:
+
+| User Says              | Skill File to Read                            |
+| ---------------------- | --------------------------------------------- |
+| "test article X"       | `.claude/skills/test-article/SKILL.md`        |
+| "add /command"         | `.claude/skills/add-command/SKILL.md`         |
+| "is this secure?"      | `.claude/skills/security-audit/SKILL.md`      |
+| "how to deploy?"       | `.claude/skills/deploy/SKILL.md`              |
+| "scraper broken"       | `.claude/skills/debug-scraper/SKILL.md`       |
+| "review my code"       | `.claude/skills/review-code/SKILL.md`         |
+| "explain architecture" | `.claude/skills/understand-codebase/SKILL.md` |
+
+## Final Rules for Cursor AI
+
+**MANDATORY PROTOCOL:**
+
+1. ✅ **CHECK** for matching skill BEFORE attempting any task
+2. ✅ **READ** the skill file completely if it exists
+3. ✅ **FOLLOW** skill's step-by-step instructions in order
+4. ✅ **USE** skill's code templates and patterns
+5. ✅ **PRESENT** results in skill's specified format
+6. ✅ **VALIDATE** input and URLs (security first)
+7. ✅ **RESPECT** architecture (handlers thin, logic in services)
+8. ✅ **HANDLE** errors gracefully (never expose stack traces)
+
+9. ❌ **NEVER** skip reading a relevant skill
+10. ❌ **NEVER** hardcode secrets or configuration
+11. ❌ **NEVER** put business logic in handlers
+12. ❌ **NEVER** fetch URLs without validation
+
+**Remember:** Skills contain hundreds of lines of detailed, tested guidance. They are your primary resource. Use them proactively.
+
+**Code quality > Speed:** Take time to write secure, maintainable code.
+
+**Security is critical:** This bot fetches external content. Always validate.
+
+**Architecture matters:** Modular structure keeps code maintainable as it grows.
+
+**Skills are your superpower:** Read them, follow them, reference them.
+
+---
+
+_Last updated: December 2024_
+_Skills: `.claude/skills/<skill-name>/SKILL.md`_
+_Read skills FIRST before attempting matching tasks_

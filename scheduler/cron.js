@@ -4,6 +4,8 @@ const telegramService = require("../services/telegramService");
 
 /**
  * Initialize and start cron jobs
+ * Schedules weekly article check (Thursday at 10:00)
+ * Calls telegramService.checkAndSend() when triggered
  */
 function startScheduler() {
   // Cron: every Thursday at 10:00 (server time)
