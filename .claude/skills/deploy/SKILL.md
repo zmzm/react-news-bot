@@ -65,7 +65,6 @@ All deployment methods need these environment variables:
 ```bash
 # Required
 BOT_TOKEN=your_telegram_bot_token
-TELEGRAM_CHAT_ID=your_chat_id
 NODE_ENV=production
 
 # Optional
@@ -315,7 +314,6 @@ railway init
 
 # Add environment variables
 railway variables set BOT_TOKEN=your_token
-railway variables set TELEGRAM_CHAT_ID=your_chat_id
 railway variables set NODE_ENV=production
 
 # Deploy
@@ -479,9 +477,8 @@ Provide deployment summary:
 
 **Environment Variables Set:**
 - BOT_TOKEN: ✅ Set (not shown)
-- TELEGRAM_CHAT_ID: ✅ Set
 - NODE_ENV: production
-- ALLOWED_USER_IDS: ✅ Set
+- ALLOWED_USER_IDS: ✅ Set (if configured)
 
 **Next Steps:**
 1. Monitor logs for errors

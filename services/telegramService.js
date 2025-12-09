@@ -1,5 +1,5 @@
 const { Telegraf } = require("telegraf");
-const { BOT_TOKEN, CHAT_ID } = require("../config/env");
+const { BOT_TOKEN } = require("../config/env");
 const articleService = require("./articleService");
 const scraper = require("./scraper");
 const stateManager = require("../utils/stateManager");
@@ -14,7 +14,6 @@ class TelegramService {
    */
   constructor() {
     this.bot = new Telegraf(BOT_TOKEN);
-    this.chatId = CHAT_ID;
   }
 
   /**
@@ -26,22 +25,25 @@ class TelegramService {
   }
 
   /**
-   * Send message to configured chat
+   * Send message to chat (context required)
+   * @param {object} ctx - Telegraf context
    * @param {string} text - Message text
    * @param {object} options - Telegram sendMessage options
    */
-  async sendMessage(text, options = {}) {
+  async sendMessage(ctx, text, options = {}) {
     const truncatedText = articleService.truncateMessage(text);
-    await this.bot.telegram.sendMessage(this.chatId, truncatedText, {
+    await ctx.reply(truncatedText, {
       disable_web_page_preview: false,
       ...options,
     });
   }
 
   /**
-   * Check for new articles and send if found
+   * Check for new articles and return content if found
+   * @param {object} ctx - Telegraf context (optional, for sending messages)
+   * @returns {Promise<{found: boolean, text?: string, articleNumber?: number}>}
    */
-  async checkAndSend() {
+  async checkAndSend(ctx = null) {
     try {
       const state = await stateManager.load();
       const articleUrl = await scraper.getLatestArticleUrl();
@@ -63,28 +65,38 @@ class TelegramService {
         console.log(
           `No new articles. Current: #${currentArticleNumber}, last: #${state.lastArticle}`
         );
-        return;
+        return { found: false };
       }
 
       console.log(`Found new article #${currentArticleNumber}, parsing React...`);
 
       const text = await articleService.getReactSectionText(articleUrl);
-      await this.sendMessage(text);
+
+      // If context provided, send the message
+      if (ctx) {
+        await this.sendMessage(ctx, text);
+      }
 
       state.lastArticle = currentArticleNumber;
       await stateManager.save(state);
 
-      console.log(`Sent article #${currentArticleNumber}`);
+      console.log(`Processed article #${currentArticleNumber}`);
+
+      return { found: true, text, articleNumber: currentArticleNumber };
     } catch (err) {
       console.error("Error in checkAndSend:", err.message);
       console.error(err.stack);
 
-      // Send error notification to admin
-      try {
-        await this.sendMessage(`⚠️ Error checking article: ${err.message}`);
-      } catch (notifyErr) {
-        console.error("Failed to send error notification:", notifyErr.message);
+      // If context provided, send error notification
+      if (ctx) {
+        try {
+          await this.sendMessage(ctx, `⚠️ Error checking article: ${err.message}`);
+        } catch (notifyErr) {
+          console.error("Failed to send error notification:", notifyErr.message);
+        }
       }
+
+      throw err;
     }
   }
 

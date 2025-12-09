@@ -498,7 +498,7 @@ Before suggesting code, verify:
 ```bash
 bun install
 cp .env.example .env
-# Edit .env with BOT_TOKEN and TELEGRAM_CHAT_ID
+# Edit .env with BOT_TOKEN
 bun scripts/test-article.js 260  # Test scraping
 bun dev  # Start with hot reload
 ```
@@ -522,7 +522,6 @@ bun prod
 
 ```bash
 BOT_TOKEN=your_telegram_bot_token_from_botfather
-TELEGRAM_CHAT_ID=your_chat_id_where_bot_sends_messages
 ```
 
 ### Optional

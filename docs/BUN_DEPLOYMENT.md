@@ -78,7 +78,6 @@ services:
     startCommand: bun start
     envVars:
       - key: BOT_TOKEN
-      - key: TELEGRAM_CHAT_ID
 ```
 
 #### 3. **Fly.io**
@@ -125,7 +124,7 @@ CMD ["bun", "run", "index.js"]
 ### Deployment Checklist
 
 - [ ] Install Bun on deployment platform
-- [ ] Set environment variables (`BOT_TOKEN`, `TELEGRAM_CHAT_ID`)
+- [ ] Set environment variables (`BOT_TOKEN`)
 - [ ] Update start command to use `bun` instead of `node`
 - [ ] Test cron job scheduling (should work the same)
 - [ ] Monitor memory usage (Bun uses less memory than Node.js)
@@ -194,7 +193,6 @@ Bun handles environment variables the same way as Node.js:
 ```bash
 # .env file (same as Node.js)
 BOT_TOKEN=your_token
-TELEGRAM_CHAT_ID=your_chat_id
 NODE_ENV=production
 ```
 

@@ -4,10 +4,12 @@ A Telegram bot that automatically sends the React section from "This Week In Rea
 
 ## Features
 
-- 🤖 Automatic weekly updates every Thursday
+- 🤖 Automatic weekly updates every Thursday at 10:00 AM
 - 📰 Fetch any article by number (`/article <number>`)
 - 🔒 Security features (rate limiting, URL validation, SSRF protection)
-- 🔄 Hot reload for development
+- 🔄 Hot reload for development (Bun watch mode or nodemon)
+- 🛡️ Robust error handling with custom error classes
+- 📝 Comprehensive logging and error reporting
 
 ## Installation
 
@@ -41,12 +43,13 @@ npm install
 cp .env.example .env
 ```
 
-3. Fill in your Telegram bot credentials:
+3. Fill in your Telegram bot token:
 
-```bash
+```env
 BOT_TOKEN=your_bot_token_here
-TELEGRAM_CHAT_ID=your_chat_id_here
 ```
+
+**Note:** The `.env` file is required for both Bun and Node.js setups.
 
 ## Usage
 
@@ -92,38 +95,55 @@ pnpm node:start
 
 ## Development
 
-The bot uses nodemon for hot reloading during development. When running `pnpm dev`:
+### Hot Reload
 
-- Changes to `index.js` will automatically restart the bot
-- Changes to `.env` will trigger a restart
-- The bot will show "DEVELOPMENT mode" in the console
-- Graceful shutdown is handled properly
+**With Bun (`bun dev`):**
 
-### File Watching
+- Uses Bun's built-in `--watch` mode
+- Automatically restarts on file changes
+- Shows "DEVELOPMENT mode" in console
+- Supports graceful shutdown
 
-Nodemon watches:
+**With Node.js (`pnpm node:dev`):**
 
-- `index.js`
-- `.env` file
-- Files with `.js` and `.json` extensions
+- Uses nodemon for hot reloading
+- Watches `.js` and `.json` files
+- Restarts on `.env` changes
+- Shows "DEVELOPMENT mode" in console
 
-Ignored files:
+### Project Structure
 
-- `node_modules/`
-- `state.json`
-- Log files
+```
+thisweekinreact-bot/
+├── config/          # Configuration (env, constants)
+├── handlers/        # Bot command handlers
+├── middleware/      # Bot middleware (auth, rate limit, errors)
+├── services/        # Business logic (scraper, articles, telegram)
+├── utils/           # Utilities (validators, errors, logger, etc.)
+├── scheduler/       # Cron jobs
+├── scripts/         # Utility scripts
+└── docs/            # Documentation
+```
+
+### Key Utilities
+
+- **`utils/validators.js`** - Input validation utilities
+- **`utils/errors.js`** - Custom error classes for better error handling
+- **`utils/logger.js`** - Logging utilities with Bun watch mode support
+- **`utils/rateLimiter.js`** - Rate limiting with automatic memory cleanup
+- **`utils/urlValidator.js`** - URL validation (SSRF protection)
+- **`utils/stateManager.js`** - State persistence management
 
 ## Environment Variables
 
 ### Required
 
-- `BOT_TOKEN` - Your Telegram bot token
-- `TELEGRAM_CHAT_ID` - The chat ID where messages will be sent
+- `BOT_TOKEN` - Your Telegram bot token (from @BotFather)
 
 ### Optional
 
-- `ALLOWED_USER_IDS` - Comma-separated list of user IDs allowed to use `/now` command
-- `NODE_ENV` - Set to `production` for production mode
+- `ALLOWED_USER_IDS` - Comma-separated list of user IDs allowed to use `/now` command (default: all users allowed)
+- `NODE_ENV` - Set to `production` for production mode (default: `development`)
 
 ## Troubleshooting
 
@@ -148,13 +168,33 @@ This will show you:
 
 ### Common Issues
 
-1. **"React section not found"** - The article might have a different HTML structure (older articles)
+1. **"React section not found"** - The article might have a different HTML structure (older articles or special announcements)
 2. **"Article not found (404)"** - The article number doesn't exist
 3. **Network errors** - Check your internet connection or the site might be down
+4. **Rate limit errors** - You've exceeded the rate limit (3 requests per 5 minutes). Wait a few minutes and try again.
 
-## Security
+### Error Handling
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed architecture information.
+The bot uses custom error classes for better error categorization:
+
+- **NetworkError** - Network/HTTP related errors
+- **ValidationError** - Input validation errors
+- **ParsingError** - HTML parsing errors
+- **NotFoundError** - Resource not found errors
+
+All errors are logged server-side with full context, while users receive user-friendly error messages.
+
+## Architecture & Security
+
+See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed architecture information.
+
+Key security features:
+
+- **SSRF Protection** - URL whitelist validation
+- **Rate Limiting** - Prevents abuse (3 requests per 5 minutes per user)
+- **Input Validation** - All inputs are validated before processing
+- **Error Handling** - No sensitive information exposed to users
+- **Memory Management** - Automatic cleanup prevents memory leaks
 
 ## License
 

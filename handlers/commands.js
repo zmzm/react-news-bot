@@ -31,8 +31,13 @@ function registerCommands() {
     }
 
     await ctx.reply("Checking the latest article, wait a second…");
-    await telegramService.checkAndSend();
-    await ctx.reply("Done (or there were no new articles).");
+    const result = await telegramService.checkAndSend(ctx);
+
+    if (result.found) {
+      await ctx.reply(`✅ Sent article #${result.articleNumber}`);
+    } else {
+      await ctx.reply("No new articles found.");
+    }
   });
 
   // /article command - get specific article by number

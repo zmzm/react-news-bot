@@ -140,7 +140,7 @@ Runs before processing user requests.
 **Checks:**
 
 - `.env` file exists
-- Required environment variables are present (BOT_TOKEN, TELEGRAM_CHAT_ID)
+- Required environment variables are present (BOT_TOKEN)
 - Dependencies are installed (node_modules exists)
 
 **Purpose:** Catch configuration issues early before attempting to run commands.

@@ -116,7 +116,7 @@ Responsibilities:
 
 - Validates required environment variables on startup
 - Provides typed exports for safe access
-- Ensures BOT_TOKEN and TELEGRAM_CHAT_ID are present
+- Ensures BOT_TOKEN is present
 - Parses ALLOWED_USER_IDS for authorization
 - Sets NODE_ENV with default
 
@@ -381,7 +381,6 @@ Read: {baseDir}/.env.example
 Required:
 
 - `BOT_TOKEN` - Telegram bot token from @BotFather
-- `TELEGRAM_CHAT_ID` - Chat ID to send messages to
 
 Optional:
 
@@ -484,7 +483,7 @@ bun install
 
 # 3. Configure environment
 cp .env.example .env
-nano .env  # Add BOT_TOKEN and TELEGRAM_CHAT_ID
+nano .env  # Add BOT_TOKEN
 
 # 4. Test scraping
 bun scripts/test-article.js 260

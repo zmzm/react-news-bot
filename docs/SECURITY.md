@@ -7,7 +7,6 @@ This document outlines the security improvements made to the bot.
 ### 1. **Environment Variable Validation**
 - ✅ Validates required environment variables on startup
 - ✅ Validates BOT_TOKEN format (Telegram token structure)
-- ✅ Validates CHAT_ID is numeric
 - ✅ Bot exits gracefully if validation fails
 
 ### 2. **Command Authorization**
@@ -58,7 +57,6 @@ This document outlines the security improvements made to the bot.
 ### Required Environment Variables
 ```bash
 BOT_TOKEN=your_bot_token_here
-TELEGRAM_CHAT_ID=your_chat_id_here
 ```
 
 ### Optional Environment Variables
