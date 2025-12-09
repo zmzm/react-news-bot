@@ -1,0 +1,10 @@
+# Bun configuration file
+# https://bun.sh/docs/cli/bunfig
+
+# Preload dotenv automatically
+preinstall = "bun install"
+
+# Environment variables
+[env]
+NODE_ENV = "development"
+

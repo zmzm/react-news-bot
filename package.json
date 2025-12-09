@@ -1,0 +1,24 @@
+{
+  "name": "thisweekinreact-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "bun run index.js",
+    "dev": "bun --watch index.js",
+    "prod": "NODE_ENV=production bun run index.js",
+    "test:article": "bun scripts/test-article.js",
+    "node:start": "node index.js",
+    "node:dev": "nodemon index.js",
+    "node:prod": "NODE_ENV=production node index.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.16.3",
+    "axios": "^1.13.2",
+    "cheerio": "^1.1.2",
+    "node-cron": "^4.2.1",
+    "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
