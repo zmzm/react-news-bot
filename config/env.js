@@ -19,12 +19,44 @@ function validateEnv() {
     console.error("❌ Invalid BOT_TOKEN format");
     process.exit(1);
   }
+
+  // Validate OPENAI_API_KEY format if provided
+  if (process.env.OPENAI_API_KEY) {
+    const apiKey = process.env.OPENAI_API_KEY.trim();
+
+    // OpenAI API keys start with "sk-" and are typically 51 characters
+    // Allow some flexibility for different key types (sk-proj-, etc.)
+    if (!apiKey.startsWith("sk-")) {
+      console.error("❌ Invalid OPENAI_API_KEY format: Must start with 'sk-'");
+      process.exit(1);
+    }
+
+    // Validate minimum length (OpenAI keys are at least 20 chars)
+    if (apiKey.length < 20) {
+      console.error("❌ Invalid OPENAI_API_KEY format: Key is too short");
+      process.exit(1);
+    }
+
+    // Validate maximum length (OpenAI keys are typically 51-200 chars)
+    if (apiKey.length > 200) {
+      console.error("❌ Invalid OPENAI_API_KEY format: Key is too long");
+      process.exit(1);
+    }
+
+    // Warn if key looks suspiciously short (might be incomplete)
+    if (apiKey.length < 40) {
+      console.warn(
+        "⚠️  Warning: OPENAI_API_KEY appears shorter than expected. Please verify it's complete."
+      );
+    }
+  }
 }
 
 validateEnv();
 
 module.exports = {
   BOT_TOKEN: process.env.BOT_TOKEN,
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   ALLOWED_USER_IDS: process.env.ALLOWED_USER_IDS
     ? process.env.ALLOWED_USER_IDS.split(",")
         .map((id) => id.trim())
@@ -32,4 +64,3 @@ module.exports = {
     : [],
   NODE_ENV: process.env.NODE_ENV || "development",
 };
-

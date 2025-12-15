@@ -1,7 +1,20 @@
-const { validateArticleUrl, validateNestedUrl } = require("../utils/urlValidator");
-const { MAX_TITLE_LENGTH, MAX_MESSAGE_LENGTH } = require("../config/constants");
+const {
+  validateArticleUrl,
+  validateNestedUrl,
+} = require("../utils/urlValidator");
+const {
+  MAX_TITLE_LENGTH,
+  MAX_MESSAGE_LENGTH,
+  ARTICLES_TO_SKIP,
+  ARTICLES_TO_SKIP_AI,
+} = require("../config/constants");
 const scraper = require("./scraper");
-const { ParsingError, NotFoundError, ValidationError, NetworkError } = require("../utils/errors");
+const {
+  ParsingError,
+  NotFoundError,
+  ValidationError,
+  NetworkError,
+} = require("../utils/errors");
 
 class ArticleService {
   /**
@@ -20,23 +33,26 @@ class ArticleService {
 
     if (!reactHeading || !reactHeading.length) {
       // Check if this is a special article (announcement, etc.)
-      const allHeadings = $("h1, h2, h3").map((_, el) => $(el).text().trim()).get();
-      const isSpecialArticle = allHeadings.some(h => 
-        h.toLowerCase().includes("announcement") ||
-        h.toLowerCase().includes("launch") ||
-        h.toLowerCase().includes("special")
+      const allHeadings = $("h1, h2, h3")
+        .map((_, el) => $(el).text().trim())
+        .get();
+      const isSpecialArticle = allHeadings.some(
+        (h) =>
+          h.toLowerCase().includes("announcement") ||
+          h.toLowerCase().includes("launch") ||
+          h.toLowerCase().includes("special")
       );
 
       if (isSpecialArticle) {
         throw new ParsingError(
           "This article is a special announcement and doesn't contain a React section. " +
-          "It may be about a launch, update, or other special content."
+            "It may be about a launch, update, or other special content."
         );
       }
 
       throw new ParsingError(
         "React section not found in the article. " +
-        "This article might have a different structure or may not contain React-related content."
+          "This article might have a different structure or may not contain React-related content."
       );
     }
 
@@ -68,10 +84,12 @@ class ArticleService {
     }
 
     // Strategy 2: Look for h2 with emoji ⚛️
-    heading = $("h2").filter((_, el) => {
-      const html = $(el).html() || "";
-      return html.includes("⚛️") || html.includes("React");
-    }).first();
+    heading = $("h2")
+      .filter((_, el) => {
+        const html = $(el).html() || "";
+        return html.includes("⚛️") || html.includes("React");
+      })
+      .first();
 
     if (heading.length) {
       console.log("Found React section using Strategy 2 (h2 with emoji)");
@@ -87,14 +105,18 @@ class ArticleService {
       .first();
 
     if (heading.length) {
-      console.log("Found React section using Strategy 3 (any heading with 'React')");
+      console.log(
+        "Found React section using Strategy 3 (any heading with 'React')"
+      );
       return heading;
     }
 
     // Debug: Log available headings for troubleshooting
-    const allHeadings = $("h1, h2, h3").map((_, el) => $(el).text().trim()).get();
+    const allHeadings = $("h1, h2, h3")
+      .map((_, el) => $(el).text().trim())
+      .get();
     console.warn("Available headings in article:", allHeadings);
-    
+
     return heading;
   }
 
@@ -108,7 +130,7 @@ class ArticleService {
 
     // Strategy 1: First link after heading
     featuredLink = reactHeading.nextAll("a").first();
-    
+
     // Strategy 2: First link in next paragraph
     if (!featuredLink.length) {
       const nextP = reactHeading.nextAll("p").first();
@@ -169,15 +191,26 @@ class ArticleService {
       if (tag === "h1" || tag === "h2") {
         // Check if it's still part of React section (not React-Native, etc.)
         const text = current.text().toLowerCase();
-        if (text.includes("react-native") || text.includes("other") || text.includes("fun")) {
+        if (
+          text.includes("react-native") ||
+          text.includes("other") ||
+          text.includes("fun")
+        ) {
           break;
         }
       }
 
-      // Extract links from lists
-      if (tag === "ul" || tag === "ol") {
+      // Extract links from ul lists (li elements inside ul tags)
+      if (tag === "ul") {
         current.find("li a").each((_, a) => {
           const $a = $(a);
+          const $li = $a.closest("li");
+
+          // Skip li items that contain the 💸 emoji
+          if (ARTICLES_TO_SKIP.some((text) => $li.text().includes(text))) {
+            return;
+          }
+
           let url = $a.attr("href");
           if (!url) return;
 
@@ -190,39 +223,18 @@ class ArticleService {
           try {
             const validatedItemUrl = validateNestedUrl(url);
             const title = $a.text().trim();
-            
+
             // Skip empty titles
             if (!title) return;
 
-            items.push({
-              title: title.substring(0, MAX_TITLE_LENGTH),
-              url: validatedItemUrl,
-            });
-          } catch (err) {
-            console.warn(`Skipping invalid URL: ${url} - ${err.message}`);
-          }
-        });
-      }
+            const aiSkip = ARTICLES_TO_SKIP_AI.some((text) =>
+              $li.text().includes(text)
+            );
 
-      // Also check for links in paragraphs (some articles might format differently)
-      if (tag === "p") {
-        current.find("a").each((_, a) => {
-          const $a = $(a);
-          let url = $a.attr("href");
-          if (!url) return;
-
-          if (!url.startsWith("http")) {
-            url = new URL(url, baseUrl).toString();
-          }
-
-          try {
-            const validatedItemUrl = validateNestedUrl(url);
-            const title = $a.text().trim();
-            
-            if (!title) return;
+            const truncatedTitle = title.substring(0, MAX_TITLE_LENGTH);
 
             items.push({
-              title: title.substring(0, MAX_TITLE_LENGTH),
+              title: aiSkip ? `${truncatedTitle} (AI skipped)` : truncatedTitle,
               url: validatedItemUrl,
             });
           } catch (err) {
@@ -275,20 +287,68 @@ class ArticleService {
   }
 
   /**
-   * Send a specific article by number
+   * Get raw React section data (for processing/AI analysis)
    * @param {number} articleNumber - The article number to fetch
-   * @returns {Promise<string>} - Formatted message text
+   * @returns {Promise<Object>} - Object with title, url, featured, and items
    */
-  async getArticle(articleNumber) {
+  async getReactSectionData(articleNumber) {
     try {
       const articleUrl = scraper.getArticleUrl(articleNumber);
       console.log(`Fetching article #${articleNumber} from ${articleUrl}`);
-      const text = await this.getReactSectionText(articleUrl);
-      return this.truncateMessage(text);
+      const validatedUrl = validateArticleUrl(articleUrl);
+      const $ = await scraper.fetch(validatedUrl);
+
+      const title = $("h1").first().text().trim() || "This Week In React";
+
+      // Try multiple strategies to find React section
+      const reactHeading = this._findReactSection($);
+
+      if (!reactHeading || !reactHeading.length) {
+        // Check if this is a special article (announcement, etc.)
+        const allHeadings = $("h1, h2, h3")
+          .map((_, el) => $(el).text().trim())
+          .get();
+        const isSpecialArticle = allHeadings.some(
+          (h) =>
+            h.toLowerCase().includes("announcement") ||
+            h.toLowerCase().includes("launch") ||
+            h.toLowerCase().includes("special")
+        );
+
+        if (isSpecialArticle) {
+          throw new ParsingError(
+            "This article is a special announcement and doesn't contain a React section. " +
+              "It may be about a launch, update, or other special content."
+          );
+        }
+
+        throw new ParsingError(
+          "React section not found in the article. " +
+            "This article might have a different structure or may not contain React-related content."
+        );
+      }
+
+      // Featured article right under the heading
+      const featured = this._extractFeatured($, reactHeading, validatedUrl);
+
+      // List of other links
+      const items = this._extractItems($, reactHeading, validatedUrl);
+
+      return {
+        issueNumber: articleNumber,
+        title,
+        url: validatedUrl,
+        featured,
+        items,
+      };
     } catch (err) {
       // Re-throw custom errors as-is
-      if (err instanceof ParsingError || err instanceof NotFoundError || 
-          err instanceof ValidationError || err instanceof NetworkError) {
+      if (
+        err instanceof ParsingError ||
+        err instanceof NotFoundError ||
+        err instanceof ValidationError ||
+        err instanceof NetworkError
+      ) {
         throw err;
       }
 
@@ -306,18 +366,97 @@ class ArticleService {
       }
 
       // Handle network errors
-      if (err.code === "ECONNREFUSED" || err.code === "ETIMEDOUT" || err.code === "ENOTFOUND") {
-        throw new NetworkError(`Network error fetching article #${articleNumber}: ${err.message}`, err.code);
+      if (
+        err.code === "ECONNREFUSED" ||
+        err.code === "ETIMEDOUT" ||
+        err.code === "ENOTFOUND"
+      ) {
+        throw new NetworkError(
+          `Network error fetching article #${articleNumber}: ${err.message}`,
+          err.code
+        );
       }
 
       // Handle URL validation errors
-      if (err.message.includes("Invalid URL") || err.message.includes("not allowed")) {
-        throw new ValidationError(`Invalid URL for article #${articleNumber}: ${err.message}`);
+      if (
+        err.message.includes("Invalid URL") ||
+        err.message.includes("not allowed")
+      ) {
+        throw new ValidationError(
+          `Invalid URL for article #${articleNumber}: ${err.message}`
+        );
       }
 
       // Generic error with original message
       console.error(`Error fetching article #${articleNumber}:`, err);
-      throw new Error(`Failed to fetch article #${articleNumber}: ${err.message}`);
+      throw new Error(
+        `Failed to fetch article #${articleNumber}: ${err.message}`
+      );
+    }
+  }
+
+  /**
+   * Send a specific article by number
+   * @param {number} articleNumber - The article number to fetch
+   * @returns {Promise<string>} - Formatted message text
+   */
+  async getArticle(articleNumber) {
+    try {
+      const articleUrl = scraper.getArticleUrl(articleNumber);
+      console.log(`Fetching article #${articleNumber} from ${articleUrl}`);
+      const text = await this.getReactSectionText(articleUrl);
+      return this.truncateMessage(text);
+    } catch (err) {
+      // Re-throw custom errors as-is
+      if (
+        err instanceof ParsingError ||
+        err instanceof NotFoundError ||
+        err instanceof ValidationError ||
+        err instanceof NetworkError
+      ) {
+        throw err;
+      }
+
+      // Handle HTTP errors (from axios)
+      if (err.response) {
+        const status = err.response.status;
+        if (status === 404) {
+          throw new NotFoundError(`Article #${articleNumber} not found (404)`);
+        }
+        throw new NetworkError(
+          `HTTP ${status} error fetching article #${articleNumber}: ${err.message}`,
+          "HTTP_ERROR",
+          status
+        );
+      }
+
+      // Handle network errors
+      if (
+        err.code === "ECONNREFUSED" ||
+        err.code === "ETIMEDOUT" ||
+        err.code === "ENOTFOUND"
+      ) {
+        throw new NetworkError(
+          `Network error fetching article #${articleNumber}: ${err.message}`,
+          err.code
+        );
+      }
+
+      // Handle URL validation errors
+      if (
+        err.message.includes("Invalid URL") ||
+        err.message.includes("not allowed")
+      ) {
+        throw new ValidationError(
+          `Invalid URL for article #${articleNumber}: ${err.message}`
+        );
+      }
+
+      // Generic error with original message
+      console.error(`Error fetching article #${articleNumber}:`, err);
+      throw new Error(
+        `Failed to fetch article #${articleNumber}: ${err.message}`
+      );
     }
   }
 }

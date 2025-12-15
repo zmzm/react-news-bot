@@ -1,7 +1,6 @@
 ---
 name: deploy
-description: Guide through deployment of the Telegram bot to various platforms including VPS, Docker, cloud platforms, with environment setup, process management, and security configuration
-allowed-tools: Write, Read, AskUserQuestion
+description: Guide through deployment of the Telegram bot to various platforms including VPS, Docker, cloud platforms, with environment setup, process management, and security configuration. Use when the user asks to deploy, host, or publish the bot to production (e.g., "deploy to Railway", "how do I host this", "set up on VPS", "containerize with Docker")
 ---
 
 # Deployment Guide

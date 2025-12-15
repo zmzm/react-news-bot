@@ -1,7 +1,6 @@
 ---
 name: test-article
-description: Test article scraping functionality by running the test script for specific article numbers, diagnosing scraping issues, and analyzing HTML structure problems
-allowed-tools: Bash, Read, Grep
+description: Test article scraping functionality by running the test script for specific article numbers, diagnosing scraping issues, and analyzing HTML structure problems. Use when the user wants to test scraping, validate article fetching, or troubleshoot specific article issues (e.g., "test article 260", "check if scraping works", "validate article fetching")
 ---
 
 # Test Article Scraping

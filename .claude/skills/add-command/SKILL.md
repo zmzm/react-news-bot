@@ -1,7 +1,6 @@
 ---
 name: add-command
-description: Add a new Telegram bot command following the project's architecture patterns, including proper middleware setup, input validation, and error handling
-allowed-tools: Read, Edit, Write, Grep, AskUserQuestion
+description: Add a new Telegram bot command following the project's architecture patterns, including proper middleware setup, input validation, and error handling. Use when the user asks to add, create, or implement a new bot command (e.g., "add a /stats command", "create a new /help command", "implement a /search feature")
 ---
 
 # Add New Bot Command

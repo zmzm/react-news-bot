@@ -127,6 +127,21 @@ Skills are **prompt-based context modifiers** that provide specialized guidance 
 
 ---
 
+#### `skill-creator/`
+
+**Description:** Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations
+
+**When to use:**
+
+- Create new skill
+- Update skill
+
+**Allowed tools:** Read, Grep, Glob, Bash, Edit, Write, AskUserQuestion
+
+**Usage:** "create new skill" or "update new skill" or "use the skill-creator to create new skill"
+
+---
+
 ## Hooks
 
 Hooks are shell scripts that run at specific lifecycle events.

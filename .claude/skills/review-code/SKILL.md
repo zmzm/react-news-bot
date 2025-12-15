@@ -1,7 +1,6 @@
 ---
 name: review-code
-description: Perform thorough code review checking architecture compliance, code quality, security vulnerabilities, performance, testability, and maintainability following project patterns
-allowed-tools: Read, Grep, Bash
+description: Perform thorough code review checking architecture compliance, code quality, security vulnerabilities, performance, testability, and maintainability following project patterns. Use when the user asks for code review, wants changes reviewed, or requests quality assessment (e.g., "review my code", "check this implementation", "is this code good?", "review the changes")
 ---
 
 # Review Code Changes

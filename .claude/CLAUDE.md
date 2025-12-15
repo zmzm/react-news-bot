@@ -268,6 +268,7 @@ Use these skills for guided assistance:
 - `debug-scraper` - Debug scraping issues
 - `review-code` - Code review
 - `understand-codebase` - Learn codebase structure
+- `skill-creator` - Create new skill or update existed
 
 Invoke by asking: "use the test-article skill" or "test article scraping"
 

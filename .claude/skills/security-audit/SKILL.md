@@ -1,7 +1,6 @@
 ---
 name: security-audit
-description: Perform comprehensive security audit of the Telegram bot covering environment variables, input validation, SSRF protection, rate limiting, authorization, error handling, and dependency vulnerabilities
-allowed-tools: Read, Grep, Bash
+description: Perform comprehensive security audit of the Telegram bot covering environment variables, input validation, SSRF protection, rate limiting, authorization, error handling, and dependency vulnerabilities. Use when the user asks for security review, audit, or wants to check for vulnerabilities (e.g., "audit security", "check for vulnerabilities", "is this secure?", "security review")
 ---
 
 # Security Audit

@@ -1,7 +1,6 @@
 ---
 name: debug-scraper
-description: Debug and fix article scraping issues by diagnosing HTML structure changes, testing selectors, analyzing errors, and updating parsing logic
-allowed-tools: Bash, Read, Edit, Grep
+description: Debug and fix article scraping issues by diagnosing HTML structure changes, testing selectors, analyzing errors, and updating parsing logic. Use when the user reports scraping failures, "React section not found" errors, article fetch issues, or asks to debug/fix the scraper (e.g., "the scraper isn't working", "fix article parsing", "debug scraping errors")
 ---
 
 # Debug Scraper Issues

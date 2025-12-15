@@ -6,6 +6,7 @@ A Telegram bot that automatically sends the React section from "This Week In Rea
 
 - 🤖 Automatic weekly updates every Thursday at 10:00 AM
 - 📰 Fetch any article by number (`/article <number>`)
+- 📚 Generate detailed article digests (`/digest <number>`) - AI-powered summaries with key takeaways
 - 🔒 Security features (rate limiting, URL validation, SSRF protection)
 - 🔄 Hot reload for development (Bun watch mode or nodemon)
 - 🛡️ Robust error handling with custom error classes
@@ -92,6 +93,7 @@ pnpm node:start
 - `/start` - Check if the bot is alive
 - `/now` - Manually check for new articles (may require authorization)
 - `/article <number>` - Get a specific article by number (e.g., `/article 260`)
+- `/digest <number>` - Generate detailed AI-powered digest of React section with summaries, key takeaways, and recommendations (requires OpenAI API key)
 
 ## Development
 
@@ -142,6 +144,7 @@ thisweekinreact-bot/
 
 ### Optional
 
+- `OPENAI_API_KEY` - Your OpenAI API key (required for `/digest` command). Get one at https://platform.openai.com/api-keys
 - `ALLOWED_USER_IDS` - Comma-separated list of user IDs allowed to use `/now` command (default: all users allowed)
 - `NODE_ENV` - Set to `production` for production mode (default: `development`)
 

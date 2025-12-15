@@ -1,7 +1,6 @@
 ---
 name: understand-codebase
-description: Provide comprehensive overview of the codebase structure, architecture, components, data flow, configuration, and guide for navigating and extending the Telegram bot project
-allowed-tools: Read, Grep, Glob
+description: Provide comprehensive overview of the codebase structure, architecture, components, data flow, configuration, and guide for navigating and extending the Telegram bot project. Use when the user wants to learn about the codebase, understand how it works, or asks about project structure (e.g., "explain the codebase", "how does this project work?", "what's the architecture?", "help me understand the code")
 ---
 
 # Understand Codebase
