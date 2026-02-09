@@ -61,9 +61,14 @@ Determine what's needed:
 - Use existing services and utilities
 
 **For Complex Commands (new functionality):**
-- Create new service in `services/` directory
+- Create new service in `services/` directory (see `add-service` skill)
 - Follow singleton pattern like existing services
 - Export service instance: `module.exports = new ServiceClass();`
+
+**For Multi-Service Commands (like `/digest` or `/article`):**
+- Command may call multiple services sequentially
+- Non-critical service calls (e.g., search indexing) should be wrapped in try-catch so failures don't break the main command
+- See `/article` handler for this pattern: article fetch + search indexing where indexing failure is non-blocking
 
 **Middleware Requirements:**
 - Rate limiting: Apply `rateLimitMiddleware()` to prevent abuse
@@ -217,6 +222,8 @@ Update `{baseDir}/README.md` to document the new command:
 - `/start` - Check if the bot is alive
 - `/now` - Manually check for new articles (admin only)
 - `/article <number>` - Get a specific article by number
+- `/digest <number>` - Generate AI-powered digest (requires OPENAI_API_KEY)
+- `/search <query>` - Search indexed articles by keyword
 - `/newcommand <param>` - Description of what the new command does
 ```
 
@@ -317,7 +324,9 @@ bot.command("help", async (ctx) => {
 
 /start - Check if bot is alive
 /article <number> - Get specific article
-/now - Check for new articles (admin)
+/digest <number> - AI-powered digest (requires OpenAI)
+/search <query> - Search indexed articles
+/now - Check for new articles (admin only)
 /help - Show this help message
   `.trim();
 
@@ -335,16 +344,24 @@ bot.command("help", async (ctx) => {
 3. Apply rate limiting
 4. Update README.md
 
-### Example 3: Command with Parameters
+### Example 3: Command with Optional Dependencies
 
-**User Request:** "Add a /search command to search articles by keyword"
+**User Request:** "Add a command that requires an optional API key"
 
-**Steps:**
-1. Create `services/searchService.js` with search logic
-2. Add command handler that parses search term from arguments
-3. Validate search term (not empty, reasonable length)
-4. Call service and format results
-5. Handle errors (no results found, service error)
+**Pattern (see `/digest` handler for real example):**
+1. Check if required config exists at the start of the handler
+2. Return early with helpful message if not configured
+3. Proceed with normal flow if config is present
+
+```javascript
+bot.command("feature", rateLimitMiddleware(), async (ctx) => {
+  if (!SOME_API_KEY) {
+    await ctx.reply("❌ This feature requires SOME_API_KEY in environment variables.");
+    return;
+  }
+  // ... rest of handler
+});
+```
 
 ## Code References
 

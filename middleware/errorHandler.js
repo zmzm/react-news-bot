@@ -1,4 +1,5 @@
 const { AppError, NetworkError, ValidationError, ParsingError, NotFoundError } = require("../utils/errors");
+const { logError } = require("../utils/logger");
 
 /**
  * Error handler middleware for Telegram bot
@@ -10,7 +11,7 @@ function errorHandler() {
       await next();
     } catch (err) {
       // Log full error details server-side
-      console.error("Bot error:", {
+      logError("Bot error:", {
         message: err.message,
         stack: err.stack,
         code: err.code,
@@ -50,9 +51,11 @@ function errorHandler() {
           userMessage = `❌ Error ${status}. Please try again.`;
         }
       } else if (err.message.includes("Invalid") || err.message.includes("not allowed")) {
-        userMessage = `❌ ${err.message}`;
-      } else if (err.message.includes("not found") || err.message.includes("structure")) {
-        userMessage = `❌ ${err.message}`;
+        userMessage = "❌ Invalid request. Please check your input and try again.";
+      } else if (err.message.includes("not found")) {
+        userMessage = "❌ The requested resource was not found.";
+      } else if (err.message.includes("structure")) {
+        userMessage = "❌ Failed to parse article content. The article structure may have changed.";
       } else if (err.message.includes("rate limit") || err.message.includes("Too many")) {
         userMessage = "⏳ Too many requests. Please wait a few minutes.";
       }
@@ -61,11 +64,10 @@ function errorHandler() {
       try {
         await ctx.reply(userMessage);
       } catch (replyErr) {
-        console.error("Failed to send error reply:", replyErr.message);
+        logError("Failed to send error reply:", replyErr.message);
       }
     }
   };
 }
 
 module.exports = errorHandler;
-

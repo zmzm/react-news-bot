@@ -3,6 +3,7 @@ const path = require("path");
 module.exports = {
   // File paths
   STATE_FILE: path.join(__dirname, "..", "state.json"),
+  SEARCH_DB_PATH: path.join(__dirname, "..", "data", "search.db"),
 
   // Rate limiting
   RATE_LIMIT_WINDOW: 5 * 60 * 1000, // 5 minutes
@@ -50,6 +51,9 @@ module.exports = {
     // Temperature limits
     MIN_TEMPERATURE: 0.0,
     MAX_TEMPERATURE: 2.0,
+
+    // API timeout (ms) - absolute limit on OpenAI API calls
+    API_TIMEOUT: 120000,
 
     // Retry configuration for rate limits
     RETRY: {

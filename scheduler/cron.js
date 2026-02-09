@@ -1,6 +1,8 @@
 const cron = require("node-cron");
 const { CRON_SCHEDULE } = require("../config/constants");
+const { TARGET_CHAT_IDS, CRON_TIMEZONE } = require("../config/env");
 const telegramService = require("../services/telegramService");
+const { logInfo, logError } = require("../utils/logger");
 
 /**
  * Initialize and start cron jobs
@@ -8,20 +10,26 @@ const telegramService = require("../services/telegramService");
  * Calls telegramService.checkAndSend() when triggered
  */
 function startScheduler() {
-  // Cron: every Thursday at 10:00 (server time)
+  // Cron: every Thursday at 10:00 (configured timezone)
   // Format: "minutes hours * * day_of_week" — 4 = Thursday
   cron.schedule(CRON_SCHEDULE, () => {
-    console.log("CRON: Thursday, checking for new article...");
-    telegramService.checkAndSend().catch((err) => {
-      console.error("CRON job error:", err);
+    logInfo("CRON: Thursday, checking for new article...");
+    telegramService.checkAndSend(null, TARGET_CHAT_IDS).catch((err) => {
+      logError("CRON job error:", err);
     });
+  }, {
+    timezone: CRON_TIMEZONE,
   });
 
-  // Log scheduler start message
-  console.log(`Scheduler started - checking every Thursday at 10:00`);
+  const targetCount = TARGET_CHAT_IDS.length;
+  logInfo(
+    `Scheduler started - checking every Thursday at 10:00 (${CRON_TIMEZONE}), target chats: ${targetCount}`
+  );
+  if (targetCount === 0) {
+    logInfo("No TARGET_CHAT_IDS configured. Scheduled checks will run, but no chat will receive auto-sent messages.");
+  }
 }
 
 module.exports = {
   startScheduler,
 };
-

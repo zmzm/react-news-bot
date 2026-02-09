@@ -12,9 +12,14 @@ function validateArticleNumber(value) {
     return { valid: false, error: "Article number is required" };
   }
 
-  const articleNumber = parseInt(value, 10);
+  const normalized = String(value).trim();
+  if (!/^\d+$/.test(normalized)) {
+    return { valid: false, error: "Article number must contain digits only" };
+  }
 
-  if (isNaN(articleNumber)) {
+  const articleNumber = Number(normalized);
+
+  if (Number.isNaN(articleNumber)) {
     return { valid: false, error: "Article number must be a valid integer" };
   }
 

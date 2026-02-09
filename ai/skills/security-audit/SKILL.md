@@ -57,7 +57,9 @@ Read: {baseDir}/handlers/commands.js
 **Evaluate each command:**
 - `/article` - Validates article number is positive integer
 - `/now` - No user input (only authorization check)
-- Other commands - Appropriate validation
+- `/digest` - Validates article number + checks OPENAI_API_KEY exists
+- `/search` - Validates query length (min 2, max 100 chars)
+- `/start` - No user input
 
 **Look for:**
 - ✅ All user input is validated before use
@@ -125,7 +127,9 @@ grep -n "rateLimitMiddleware" {baseDir}/handlers/commands.js
 **Verify:**
 - `/article` command has rate limiting
 - `/now` command has rate limiting
-- Rate limits are reasonable (not too restrictive, not too permissive)
+- `/digest` command has rate limiting
+- `/search` command has rate limiting
+- Rate limits are reasonable (3 req / 5 min per user)
 
 **Recommendations:**
 - Consider persistent storage for rate limits (Redis, database)
@@ -270,6 +274,58 @@ Read: {baseDir}/config/env.js
 - Error details hidden in production
 - Monitoring and alerting configured
 
+### Step 11: OpenAI API Security
+
+**Check OpenAI security utilities:**
+```bash
+Read: {baseDir}/utils/openaiSecurity.js
+Read: {baseDir}/services/openaiService.js
+Read: {baseDir}/config/constants.js  # OPENAI section
+```
+
+**Model Validation:**
+- ✅ `validateModel()` checks against ALLOWED_MODELS whitelist
+- ✅ Unknown models rejected with explicit error
+- ✅ Default model used when none specified
+
+**Verify allowed models list:**
+```bash
+grep "ALLOWED_MODELS" {baseDir}/config/constants.js
+```
+
+**Token Limits:**
+- ✅ `validateMaxTokens()` enforces MAX_ABSOLUTE cap (8000)
+- ✅ Default tokens per operation type (DEFAULT: 2000, DIGEST: 4000)
+- ✅ Prevents excessive API costs
+
+**Prompt Injection Protection:**
+- ✅ `sanitizeContent()` removes control characters and normalizes whitespace
+- ✅ `validatePromptLength()` enforces max prompt size (200K chars)
+- ✅ `validateSystemPromptLength()` limits system prompt (2K chars)
+- ✅ Article content truncated per-article (MAX_ARTICLE_CONTENT_LENGTH: 10K)
+- ✅ Total content capped (MAX_TOTAL_CONTENT_LENGTH: 150K)
+- ⚠️  Review: Are prompt injection patterns from scraped external content adequately handled?
+
+**API Key Security:**
+- ✅ `sanitizeApiKey()` redacts keys in log output
+- ✅ OPENAI_API_KEY validated on load (must start with "sk-", length 20-200)
+- ✅ Key stored in .env, not hardcoded
+
+**Cost Protection:**
+- ✅ Token limits prevent runaway costs
+- ✅ `calculateCost()` tracks usage in dev mode
+- ✅ Retry limited to MAX_ATTEMPTS (3) with backoff
+- ⚠️  No per-user or per-day cost cap (acceptable for small bot, risk if exposed publicly)
+
+**Temperature Validation:**
+- ✅ `validateTemperature()` clamps to valid range (0.0-2.0)
+
+**External URL Fetching (Digest):**
+- ✅ `scraper.fetchExternal()` uses `validateNestedUrl()` (permissive but validates)
+- ✅ Double timeout for external URLs
+- ✅ User-Agent header set
+- ⚠️  External URLs from scraped content are fetched server-side — review for SSRF if allowed domains list changes
+
 ## Output Format
 
 Provide a comprehensive security report:
@@ -318,6 +374,9 @@ Recommendations:
 [Same format]
 
 ## 10. Production Configuration ✅/⚠️/❌
+[Same format]
+
+## 11. OpenAI API Security ✅/⚠️/❌
 [Same format]
 
 ## Priority Action Items
@@ -421,8 +480,10 @@ Recommendation:
 ## Code References
 
 - Environment config: `{baseDir}/config/env.js`
-- Constants: `{baseDir}/config/constants.js`
+- Constants (incl. OpenAI limits): `{baseDir}/config/constants.js`
 - URL validator: `{baseDir}/utils/urlValidator.js`
+- OpenAI security: `{baseDir}/utils/openaiSecurity.js`
+- OpenAI service: `{baseDir}/services/openaiService.js`
 - Rate limiter: `{baseDir}/utils/rateLimiter.js`
 - Auth middleware: `{baseDir}/middleware/auth.js`
 - Error handler: `{baseDir}/middleware/errorHandler.js`

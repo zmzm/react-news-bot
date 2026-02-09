@@ -1,5 +1,6 @@
 const fsPromises = require("fs").promises;
 const { STATE_FILE } = require("../config/constants");
+const { logError } = require("./logger");
 
 /**
  * State manager for bot state persistence
@@ -30,7 +31,7 @@ class StateManager {
         // File doesn't exist, return default state
         return { lastArticle: 0 };
       }
-      console.error("Error loading state:", e.message);
+      logError("Error loading state:", e.message);
       return { lastArticle: 0 };
     }
   }
@@ -57,11 +58,10 @@ class StateManager {
       await fsPromises.writeFile(tempFile, data, "utf8");
       await fsPromises.rename(tempFile, STATE_FILE);
     } catch (e) {
-      console.error("Error saving state:", e.message);
+      logError("Error saving state:", e.message);
       throw e;
     }
   }
 }
 
 module.exports = new StateManager();
-

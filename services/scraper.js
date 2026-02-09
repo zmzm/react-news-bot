@@ -4,6 +4,7 @@ const { HTTP_TIMEOUT, MAX_RESPONSE_SIZE } = require("../config/constants");
 const {
   validateArticleUrl,
   validateNestedUrl,
+  assertExternalUrlResolvesPublicly,
 } = require("../utils/urlValidator");
 const { handleAxiosError, NetworkError } = require("../utils/errors");
 
@@ -16,6 +17,29 @@ const axiosConfig = {
 };
 
 class Scraper {
+  constructor() {
+    this._cache = new Map();
+    this._cacheTTL = 5 * 60 * 1000; // 5 minutes
+  }
+
+  _getCached(url) {
+    const entry = this._cache.get(url);
+    if (entry && Date.now() - entry.timestamp < this._cacheTTL) {
+      return entry.html;
+    }
+    this._cache.delete(url);
+    return null;
+  }
+
+  _setCache(url, html) {
+    this._cache.set(url, { html, timestamp: Date.now() });
+    // Evict oldest entry if cache grows too large
+    if (this._cache.size > 50) {
+      const oldest = this._cache.keys().next().value;
+      this._cache.delete(oldest);
+    }
+  }
+
   /**
    * Fetch HTML content from URL
    * @param {string} url - URL to fetch
@@ -24,11 +48,21 @@ class Scraper {
   async fetch(url) {
     try {
       const validatedUrl = validateArticleUrl(url);
+
+      // Check cache first
+      const cachedHtml = this._getCached(validatedUrl);
+      if (cachedHtml) {
+        return cheerio.load(cachedHtml);
+      }
+
       const res = await axios.get(validatedUrl, axiosConfig);
 
       if (!res.data) {
         throw new NetworkError("Empty response from server");
       }
+
+      // Cache the raw HTML
+      this._setCache(validatedUrl, res.data);
 
       return cheerio.load(res.data);
     } catch (err) {
@@ -87,9 +121,12 @@ class Scraper {
   async fetchExternal(url) {
     try {
       const validatedUrl = validateNestedUrl(url);
+      await assertExternalUrlResolvesPublicly(validatedUrl);
+
       const res = await axios.get(validatedUrl, {
         ...axiosConfig,
         timeout: HTTP_TIMEOUT * 2, // Give external URLs more time
+        maxRedirects: 5,
         headers: {
           "User-Agent": "Mozilla/5.0 (compatible; ThisWeekInReactBot/1.0)",
         },
@@ -98,6 +135,14 @@ class Scraper {
       if (!res.data) {
         throw new NetworkError("Empty response from server");
       }
+
+      // Validate final URL after redirects to prevent redirect-based SSRF bypass.
+      const finalUrl =
+        res.request?.res?.responseUrl ||
+        res.request?.responseURL ||
+        validatedUrl;
+      const validatedFinalUrl = validateNestedUrl(finalUrl);
+      await assertExternalUrlResolvesPublicly(validatedFinalUrl);
 
       return cheerio.load(res.data);
     } catch (err) {

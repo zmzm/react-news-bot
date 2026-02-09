@@ -169,9 +169,16 @@ Verify:
 - ✅ No secrets in comments or logs
 
 **SQL Injection / Command Injection:**
-- ✅ No dynamic SQL (not applicable here)
+- ✅ No dynamic SQL (SQLite uses parameterized queries in searchService)
 - ✅ No shell command injection vectors
 - ✅ No `eval()` or `Function()` usage
+
+**OpenAI API Security (if changes touch AI features):**
+- ✅ Model validated via `validateModel()` from `utils/openaiSecurity.js`
+- ✅ Token limits enforced via `validateMaxTokens()`
+- ✅ Prompt length checked via `validatePromptLength()`
+- ✅ Content sanitized via `sanitizeContent()`
+- ✅ API key not logged (sanitizeApiKey in logger)
 
 **Rate Limiting:**
 ```bash
@@ -200,7 +207,45 @@ Verify:
 - ✅ Generic messages for users
 - ✅ Detailed logs server-side only
 
-### Step 5: Bot-Specific Patterns
+### Step 5: Service Chaining & Non-Blocking Patterns
+
+Commands in this project often call multiple services. Verify these patterns:
+
+**Non-blocking secondary operations:**
+
+Several commands (e.g., `/article`, `/digest`) call `searchService.indexArticles()` after the main operation. This indexing is wrapped in a try-catch so it doesn't break the primary command:
+
+```javascript
+// ✅ Correct: non-blocking indexing
+try {
+  const data = await articleService.getReactSectionData(num);
+  try {
+    await searchService.indexArticles(data);
+  } catch (indexErr) {
+    console.error("Failed to index:", indexErr.message); // Log but don't fail
+  }
+} catch (dataErr) {
+  console.error("Failed to get data for indexing:", dataErr.message);
+}
+
+// ❌ Wrong: indexing failure breaks the command
+const data = await articleService.getReactSectionData(num);
+await searchService.indexArticles(data); // If this throws, user gets error
+```
+
+**Verify for new commands:**
+- Is the primary operation (what the user asked for) always completed?
+- Are secondary operations (indexing, logging, analytics) non-blocking?
+- Are errors from secondary operations logged but not re-thrown?
+
+**Optional dependency checks:**
+
+Commands like `/digest` require `OPENAI_API_KEY`. Verify:
+- Config check happens BEFORE any heavy operations
+- User gets a clear message about what's missing
+- No partial execution if config is missing
+
+### Step 6: Bot-Specific Patterns
 
 For Telegram bot changes:
 
@@ -244,7 +289,7 @@ catch (err) {
 }
 ```
 
-### Step 6: Performance Considerations
+### Step 7: Performance Considerations
 
 Evaluate performance impact:
 
@@ -272,7 +317,7 @@ Check:
 - ✅ No unnecessary parsing
 - ✅ Minimal DOM traversal
 
-### Step 7: Testability
+### Step 8: Testability
 
 Assess how testable the code is:
 
@@ -297,7 +342,7 @@ Recommended tests:
 5. Edge case: /newcommand with rate limit exceeded
 ```
 
-### Step 8: Maintainability
+### Step 9: Maintainability
 
 Consider long-term maintenance:
 
@@ -329,7 +374,7 @@ Evaluate:
 - ✅ Follows project conventions
 - ✅ No new patterns without good reason
 
-### Step 9: Edge Cases
+### Step 10: Edge Cases
 
 Identify edge cases to test:
 
@@ -353,7 +398,7 @@ Identify edge cases to test:
 - State file concurrent writes
 - Race conditions
 
-### Step 10: Final Checklist
+### Step 11: Final Checklist
 
 Provide comprehensive checklist:
 
@@ -377,6 +422,8 @@ Provide comprehensive checklist:
 - [ ] Breaking changes noted
 - [ ] Edge cases considered
 - [ ] Performance acceptable
+- [ ] Non-blocking secondary operations don't break primary flow
+- [ ] OpenAI calls use security utilities (if applicable)
 
 ## Output Format
 

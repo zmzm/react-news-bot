@@ -67,10 +67,15 @@ BOT_TOKEN=your_telegram_bot_token
 NODE_ENV=production
 
 # Optional
-ALLOWED_USER_IDS=comma,separated,user,ids
+OPENAI_API_KEY=sk-your_openai_api_key  # Enables /digest command
+ALLOWED_USER_IDS=comma,separated,user,ids  # Restricts /now command
 ```
 
 **IMPORTANT:** Never commit `.env` to git. Use platform-specific secrets management.
+
+**Writable paths required:**
+- `state.json` — bot state (last article number)
+- `data/` directory — SQLite search database (`search.db`, created automatically)
 
 ### Step 4A: VPS/Server Deployment with Systemd
 
@@ -259,6 +264,7 @@ services:
       - NODE_ENV=production
     volumes:
       - ./state.json:/app/state.json
+      - ./data:/app/data
     logging:
       driver: "json-file"
       options:
@@ -314,6 +320,7 @@ railway init
 # Add environment variables
 railway variables set BOT_TOKEN=your_token
 railway variables set NODE_ENV=production
+# Optional: railway variables set OPENAI_API_KEY=sk-your_key
 
 # Deploy
 railway up
@@ -359,6 +366,12 @@ Expected response: "Hi! I'll send you the React section from This Week In React 
 ```
 /article 260
 Expected: Article content displayed
+
+/search hooks
+Expected: Search results (if articles have been indexed)
+
+/digest 260  (only if OPENAI_API_KEY is set)
+Expected: AI-generated digest
 ```
 
 **Step 5.3: Check Logs**
@@ -438,6 +451,7 @@ sudo ufw enable
 
 **What to backup:**
 - `state.json` - Tracks sent articles
+- `data/search.db` - Search index (can be rebuilt but saves time)
 - `.env` - Environment variables (store securely!)
 - Application code (Git repository)
 
@@ -477,6 +491,7 @@ Provide deployment summary:
 **Environment Variables Set:**
 - BOT_TOKEN: ✅ Set (not shown)
 - NODE_ENV: production
+- OPENAI_API_KEY: ✅ Set / ❌ Not set (optional)
 - ALLOWED_USER_IDS: ✅ Set (if configured)
 
 **Next Steps:**

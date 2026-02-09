@@ -50,6 +50,18 @@ function validateEnv() {
       );
     }
   }
+
+  // Validate CRON_TIMEZONE if provided (must be valid IANA timezone)
+  if (process.env.CRON_TIMEZONE) {
+    try {
+      Intl.DateTimeFormat("en-US", { timeZone: process.env.CRON_TIMEZONE });
+    } catch {
+      console.error(
+        `❌ Invalid CRON_TIMEZONE: "${process.env.CRON_TIMEZONE}". Use a valid IANA timezone (e.g. UTC, America/New_York).`
+      );
+      process.exit(1);
+    }
+  }
 }
 
 validateEnv();
@@ -62,5 +74,11 @@ module.exports = {
         .map((id) => id.trim())
         .filter(Boolean)
     : [],
+  TARGET_CHAT_IDS: process.env.TARGET_CHAT_IDS
+    ? process.env.TARGET_CHAT_IDS.split(",")
+        .map((id) => id.trim())
+        .filter(Boolean)
+    : [],
+  CRON_TIMEZONE: process.env.CRON_TIMEZONE || "UTC",
   NODE_ENV: process.env.NODE_ENV || "development",
 };

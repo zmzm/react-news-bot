@@ -1,8 +1,10 @@
 const { Telegraf } = require("telegraf");
 const { BOT_TOKEN } = require("../config/env");
 const articleService = require("./articleService");
+const searchService = require("./searchService");
 const scraper = require("./scraper");
 const stateManager = require("../utils/stateManager");
+const { logInfo, logError } = require("../utils/logger");
 
 /**
  * Telegram bot service
@@ -39,11 +41,25 @@ class TelegramService {
   }
 
   /**
+   * Send message to explicit chat id (used by cron jobs without ctx)
+   * @param {string|number} chatId - Telegram chat id
+   * @param {string} text - Message text
+   * @param {object} options - Telegram sendMessage options
+   */
+  async sendMessageToChat(chatId, text, options = {}) {
+    const truncatedText = articleService.truncateMessage(text);
+    await this.bot.telegram.sendMessage(chatId, truncatedText, {
+      disable_web_page_preview: false,
+      ...options,
+    });
+  }
+
+  /**
    * Check for new articles and return content if found
    * @param {object} ctx - Telegraf context (optional, for sending messages)
    * @returns {Promise<{found: boolean, text?: string, articleNumber?: number}>}
    */
-  async checkAndSend(ctx = null) {
+  async checkAndSend(ctx = null, targetChatIds = []) {
     try {
       const state = await stateManager.load();
       const articleUrl = await scraper.getLatestArticleUrl();
@@ -62,37 +78,71 @@ class TelegramService {
       }
 
       if (currentArticleNumber <= state.lastArticle) {
-        console.log(
+        logInfo(
           `No new articles. Current: #${currentArticleNumber}, last: #${state.lastArticle}`
         );
         return { found: false };
       }
 
-      console.log(`Found new article #${currentArticleNumber}, parsing React...`);
+      logInfo(
+        `Found new article #${currentArticleNumber}, parsing React...`
+      );
 
-      const text = await articleService.getReactSectionText(articleUrl);
+      const { text, data: reactSectionData } = await articleService.getArticleWithData(currentArticleNumber);
+
+      // Index articles for search (non-blocking, don't fail if it errors)
+      try {
+        const indexedCount = await searchService.indexArticles(
+          reactSectionData
+        );
+        if (indexedCount > 0) {
+          logInfo(
+            `Indexed ${indexedCount} articles from issue #${currentArticleNumber}`
+          );
+        }
+      } catch (indexErr) {
+        // Don't fail the whole operation if indexing fails
+        logError("Failed to index articles:", indexErr);
+      }
 
       // If context provided, send the message
       if (ctx) {
         await this.sendMessage(ctx, text);
+      } else if (targetChatIds.length > 0) {
+        let delivered = 0;
+
+        for (const chatId of targetChatIds) {
+          try {
+            await this.sendMessageToChat(chatId, text);
+            delivered += 1;
+          } catch (sendErr) {
+            logError(`Failed to send scheduled message to chat ${chatId}:`, sendErr);
+          }
+        }
+
+        if (delivered === 0) {
+          throw new Error("Failed to deliver scheduled message to all configured TARGET_CHAT_IDS");
+        }
       }
 
       state.lastArticle = currentArticleNumber;
       await stateManager.save(state);
 
-      console.log(`Processed article #${currentArticleNumber}`);
+      logInfo(`Processed article #${currentArticleNumber}`);
 
       return { found: true, text, articleNumber: currentArticleNumber };
     } catch (err) {
-      console.error("Error in checkAndSend:", err.message);
-      console.error(err.stack);
+      logError("Error in checkAndSend:", err);
 
       // If context provided, send error notification
       if (ctx) {
         try {
-          await this.sendMessage(ctx, `⚠️ Error checking article: ${err.message}`);
+          await this.sendMessage(
+            ctx,
+            `⚠️ Error checking article: ${err.message}`
+          );
         } catch (notifyErr) {
-          console.error("Failed to send error notification:", notifyErr.message);
+          logError("Failed to send error notification:", notifyErr.message);
         }
       }
 
@@ -107,7 +157,7 @@ class TelegramService {
     // bot.launch() is async but doesn't block, so we wait a bit to ensure it's ready
     await this.bot.launch();
     // Small delay to ensure bot is fully initialized
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
   /**
@@ -120,4 +170,3 @@ class TelegramService {
 }
 
 module.exports = new TelegramService();
-

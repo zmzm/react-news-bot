@@ -6,6 +6,9 @@
 # State file (optional - you may want to track this)
 # state.json
 
+# Data directory (search database)
+data/
+
 # Dependencies
 node_modules/
 

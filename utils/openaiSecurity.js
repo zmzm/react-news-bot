@@ -25,12 +25,12 @@ function validateModel(model) {
 
   const normalizedModel = model.trim().toLowerCase();
 
-  // Check if model is in allowlist
-  const isAllowed = OPENAI.ALLOWED_MODELS.some(
+  // Check if model is in allowlist and return canonical name
+  const matchedModel = OPENAI.ALLOWED_MODELS.find(
     (allowed) => allowed.toLowerCase() === normalizedModel
   );
 
-  if (!isAllowed) {
+  if (!matchedModel) {
     throw new Error(
       `Model "${model}" is not allowed. Allowed models: ${OPENAI.ALLOWED_MODELS.join(
         ", "
@@ -38,7 +38,7 @@ function validateModel(model) {
     );
   }
 
-  return model;
+  return matchedModel;
 }
 
 /**

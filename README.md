@@ -4,9 +4,10 @@ A Telegram bot that automatically sends the React section from "This Week In Rea
 
 ## Features
 
-- 🤖 Automatic weekly updates every Thursday at 10:00 AM
+- 🤖 Automatic weekly updates every Thursday at 10:00 AM (to configured target chats)
 - 📰 Fetch any article by number (`/article <number>`)
 - 📚 Generate detailed article digests (`/digest <number>`) - AI-powered summaries with key takeaways
+- 🔍 Search articles by keyword (`/search <query>`) - Fast keyword search across all indexed articles
 - 🔒 Security features (rate limiting, URL validation, SSRF protection)
 - 🔄 Hot reload for development (Bun watch mode or nodemon)
 - 🛡️ Robust error handling with custom error classes
@@ -94,6 +95,7 @@ pnpm node:start
 - `/now` - Manually check for new articles (may require authorization)
 - `/article <number>` - Get a specific article by number (e.g., `/article 260`)
 - `/digest <number>` - Generate detailed AI-powered digest of React section with summaries, key takeaways, and recommendations (requires OpenAI API key)
+- `/search <query>` - Search articles by keyword across all indexed React articles (e.g., `/search hooks`)
 
 ## Development
 
@@ -120,10 +122,11 @@ thisweekinreact-bot/
 ├── config/          # Configuration (env, constants)
 ├── handlers/        # Bot command handlers
 ├── middleware/      # Bot middleware (auth, rate limit, errors)
-├── services/        # Business logic (scraper, articles, telegram)
+├── services/        # Business logic (scraper, articles, telegram, search)
 ├── utils/           # Utilities (validators, errors, logger, etc.)
 ├── scheduler/       # Cron jobs
 ├── scripts/         # Utility scripts
+├── data/            # Data storage (search database)
 └── docs/            # Documentation
 ```
 
@@ -144,8 +147,10 @@ thisweekinreact-bot/
 
 ### Optional
 
-- `OPENAI_API_KEY` - Your OpenAI API key (required for `/digest` command). Get one at https://platform.openai.com/api-keys
+- `OPENAI_API_KEY` - Your OpenAI API key (optional, required only for `/digest` command). Get one at https://platform.openai.com/api-keys
 - `ALLOWED_USER_IDS` - Comma-separated list of user IDs allowed to use `/now` command (default: all users allowed)
+- `TARGET_CHAT_IDS` - Comma-separated chat IDs for scheduled auto-delivery. If empty, scheduler checks for updates but does not auto-send.
+- `CRON_TIMEZONE` - IANA timezone for scheduler (default: `UTC`, example: `America/New_York`)
 - `NODE_ENV` - Set to `production` for production mode (default: `development`)
 
 ## Troubleshooting
@@ -169,12 +174,23 @@ This will show you:
 - What headings are available in the article
 - Why the React section might not be found
 
+### Search Index
+
+The `/search` command uses a SQLite database with FTS5 for fast keyword search. Articles are automatically indexed when:
+- New articles are found via the weekly cron job
+- Articles are manually checked via `/now` command
+
+To build the search index for existing articles, you can manually fetch articles using `/article <number>` or wait for the automatic indexing when new articles arrive.
+
+The search database is stored in `data/search.db` and is automatically created on first use.
+
 ### Common Issues
 
 1. **"React section not found"** - The article might have a different HTML structure (older articles or special announcements)
 2. **"Article not found (404)"** - The article number doesn't exist
 3. **Network errors** - Check your internet connection or the site might be down
 4. **Rate limit errors** - You've exceeded the rate limit (3 requests per 5 minutes). Wait a few minutes and try again.
+5. **"No articles found" in search** - The search index might be empty. Try fetching some articles first using `/article <number>` to build the index.
 
 ### Error Handling
 

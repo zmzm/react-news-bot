@@ -28,20 +28,24 @@ This is a Telegram bot that automatically sends the React section from "This Wee
 
 **Tech Stack:**
 
-- **Runtime:** Bun
+- **Runtime:** Bun (preferred) or Node.js
 - **Bot Framework:** Telegraf (Telegram bot framework)
 - **HTTP Client:** Axios (for fetching articles)
 - **HTML Parser:** Cheerio (jQuery-like HTML parsing)
 - **Scheduler:** node-cron (for scheduled tasks)
+- **AI:** OpenAI API (for article digests)
+- **Search:** SQLite FTS5 (Bun native or better-sqlite3)
 - **Environment:** dotenv (environment variable management)
 
 **Key Features:**
 
 1. Automated weekly updates (Thursday 10:00 AM)
 2. Manual article fetching via `/article <number>` command
-3. Security features (rate limiting, URL validation, SSRF protection)
-4. Modular architecture with separation of concerns
-5. Hot reload support for development
+3. AI-powered article digests via `/digest <number>` (OpenAI)
+4. Full-text article search via `/search <query>` (SQLite FTS5)
+5. Security features (rate limiting, URL validation, SSRF protection)
+6. Modular architecture with separation of concerns
+7. Hot reload support for development
 
 **Read architecture doc:**
 
@@ -64,39 +68,41 @@ ls -la {baseDir}
 thisweekinreact-bot/
 ├── config/              # Configuration and environment
 │   ├── env.js          # Environment variable validation
-│   └── constants.js    # Application constants
-├── services/           # Business logic
+│   └── constants.js    # Application constants (incl. OpenAI limits)
+├── services/           # Business logic (singleton pattern)
 │   ├── scraper.js      # HTTP fetching and HTML parsing
-│   ├── articleService.js # Article parsing and formatting
-│   └── telegramService.js # Bot operations
-├── handlers/           # Command handlers
+│   ├── articleService.js # Article parsing and formatting (most fragile)
+│   ├── telegramService.js # Bot operations and lifecycle
+│   ├── openaiService.js # AI digest generation (OpenAI API)
+│   └── searchService.js # Full-text search (SQLite FTS5)
+├── handlers/           # Command handlers (thin, delegate to services)
 │   └── commands.js     # Bot command definitions
 ├── middleware/         # Bot middleware
 │   ├── errorHandler.js # Error handling
 │   ├── auth.js         # Authorization
 │   └── rateLimit.js    # Rate limiting
 ├── utils/              # Utilities
+│   ├── errors.js       # Custom error classes (AppError, NetworkError, etc.)
 │   ├── urlValidator.js # URL validation (SSRF protection)
+│   ├── validators.js   # Input validation (article numbers, args)
 │   ├── rateLimiter.js  # Rate limiter logic
-│   └── stateManager.js # State persistence
+│   ├── stateManager.js # Atomic state persistence
+│   ├── logger.js       # Logging with API key sanitization
+│   └── openaiSecurity.js # OpenAI security validations
 ├── scheduler/          # Scheduled tasks
 │   └── cron.js         # Cron job definitions
 ├── scripts/            # Utility scripts
 │   └── test-article.js # Test article scraping
+├── data/               # Runtime data
+│   └── search.db       # SQLite FTS5 search database
+├── ai/                 # AI skills for guided assistance
+│   └── skills/         # Skill definitions (SKILL.md files)
 ├── docs/               # Documentation
-│   ├── ARCHITECTURE.md
-│   ├── SECURITY.md
-│   ├── BUN_DEPLOYMENT.md
-│   └── SCRAPING_STRATEGY.md
-├── .claude/            # Claude Code configuration
-│   ├── hooks/          # Lifecycle hooks
-│   └── skills/         # Reusable skills
 ├── index.js            # Main entry point
 ├── package.json        # Dependencies and scripts
-├── state.json          # Bot state (last sent article)
+├── state.json          # Bot state (last sent article number)
 ├── .env                # Environment variables (not in git)
-├── .env.example        # Environment template
-└── CLAUDE.md           # Claude Code instructions
+└── .env.example        # Environment template
 ```
 
 ### Step 3: Core Components Explained
@@ -144,20 +150,22 @@ Read: {baseDir}/services/scraper.js
 
 Responsibilities:
 
-- Configures axios HTTP client
-- Fetches HTML content from URLs
+- Configures axios HTTP client with timeouts and size limits
+- Fetches HTML content from URLs (validates all URLs before fetching)
 - Loads HTML into Cheerio for parsing
 - Gets latest article URL from newsletter page
 - Builds article URLs from numbers
-- ALWAYS validates URLs before fetching
+- Fetches external URLs for AI digest content extraction
 
 Key methods:
 
-- `fetch(url)` - Fetch and parse HTML
+- `fetch(url)` - Fetch and parse HTML from thisweekinreact.com
+- `fetchExternal(url)` - Fetch external article URLs (for digest)
+- `extractArticleContent($)` - Extract readable text from any article page
 - `getLatestArticleUrl()` - Get latest article URL
 - `getArticleUrl(number)` - Build URL for article number
 
-**articleService.js:**
+**articleService.js (most fragile file):**
 
 ```bash
 Read: {baseDir}/services/articleService.js
@@ -166,24 +174,26 @@ Read: {baseDir}/services/articleService.js
 Responsibilities:
 
 - Parses React section from article HTML
-- Extracts featured articles
-- Extracts list items
+- Uses 3 fallback strategies to find React heading
+- Extracts featured articles and item lists
 - Formats content for Telegram
+- Provides raw structured data for AI digest
 - Handles message truncation
-- Error handling for parse failures
 
 Key methods:
 
-- `getArticle(number)` - Main entry point
-- `parseReactSection($)` - Extract React content
-- `formatMessage(...)` - Format for Telegram
+- `getArticle(number)` - Get formatted article text
+- `getReactSectionText(url)` - Parse and format React section
+- `getReactSectionData(number)` - Get structured data (for `/digest` and search indexing)
+- `_findReactSection($)` - Multi-strategy heading finder
+- `_extractFeatured($, heading, url)` - Featured article extraction
+- `_extractItems($, heading, url)` - Item list extraction
 
-Parsing strategy:
+Parsing strategy (3 fallback strategies):
 
-1. Find React section heading (h2 containing "React")
-2. Extract featured subsection (h3 "Featured")
-3. Extract list items between heading and next h2
-4. Format as Telegram message with links
+1. h2 containing "react" text (excluding "react-native")
+2. h2 with ⚛️ emoji
+3. Any heading (h1-h3) containing "react"
 
 **telegramService.js:**
 
@@ -194,18 +204,56 @@ Read: {baseDir}/services/telegramService.js
 Responsibilities:
 
 - Manages Telegraf bot instance
-- Sends messages to configured chat
-- Checks for new articles
-- Prevents duplicate sends (via state.json)
+- Sends messages (with truncation) to users
+- Checks for new articles and compares with state
+- Triggers search indexing when new articles found
 - Bot lifecycle (launch, stop)
 
 Key methods:
 
 - `getBot()` - Get bot instance
-- `launch()` - Start bot
-- `stop()` - Graceful shutdown
-- `sendMessage(text)` - Send to configured chat
-- `checkAndSend()` - Check for new articles and send
+- `launch()` / `stop()` - Bot lifecycle
+- `sendMessage(ctx, text, options)` - Send truncated message
+- `checkAndSend(ctx)` - Check for new articles, index, and send
+
+**openaiService.js:**
+
+```bash
+Read: {baseDir}/services/openaiService.js
+```
+
+Responsibilities:
+
+- Generates AI-powered article digests via OpenAI API
+- Fetches and parses content from all articles in React section
+- Applies security limits (model whitelist, token caps, prompt length)
+- Implements retry with exponential backoff for rate limits
+- Tracks token usage and cost in development mode
+
+Key methods:
+
+- `chat(prompt, systemPrompt, options)` - General OpenAI chat
+- `createReactDigest(reactSectionData, progressCallback)` - Generate digest
+- `_retryWithBackoff(fn, maxAttempts, attempt)` - Retry logic
+
+**searchService.js:**
+
+```bash
+Read: {baseDir}/services/searchService.js
+```
+
+Responsibilities:
+
+- Full-text search across indexed articles (SQLite FTS5)
+- Auto-detects Bun native SQLite vs better-sqlite3
+- Lazy initialization (database created on first use)
+- Indexes articles when fetched via any command
+
+Key methods:
+
+- `indexArticles(reactSectionData)` - Index articles from an issue
+- `search(query, limit)` - Full-text search with relevance scoring
+- `_initialize()` - Lazy DB init with schema migration
 
 #### Handlers Module (`handlers/`)
 
@@ -225,9 +273,11 @@ Responsibilities:
 
 Commands:
 
-- `/start` - Welcome message (no middleware needed)
-- `/now` - Manual check (auth + rate limit)
+- `/start` - Welcome message (no middleware)
+- `/now` - Manual check for new articles (auth + rate limit)
 - `/article <number>` - Fetch specific article (rate limit)
+- `/digest <number>` - AI-powered digest with summaries (rate limit, requires OPENAI_API_KEY)
+- `/search <query>` - Full-text search across indexed articles (rate limit)
 
 Pattern:
 
@@ -264,32 +314,41 @@ bot.command("name", rateLimitMiddleware(), async (ctx) => {
 
 #### Utils Module (`utils/`)
 
-**urlValidator.js:**
+**errors.js:**
 
-```bash
-Read: {baseDir}/utils/urlValidator.js
-```
+- Custom error class hierarchy: `AppError` → `NetworkError`, `ValidationError`, `ParsingError`, `NotFoundError`
+- Used across all services for consistent error categorization
+
+**urlValidator.js:**
 
 CRITICAL for security:
 
-- Validates URLs against whitelist
-- Only allows `thisweekinreact.com`
+- `validateArticleUrl()` — strict whitelist, only `thisweekinreact.com`, HTTPS only
+- `validateNestedUrl()` — permissive for external article links (used by digest)
 - Prevents SSRF attacks
-- Two validators: strict (article URLs) and permissive (nested links)
+
+**validators.js:**
+
+- `validateArticleNumber(input)` — positive integer check
+- `parseCommandArgs(text)` — command argument parsing
 
 **rateLimiter.js:**
 
-- Rate limiter class
-- In-memory storage (per user)
-- Configurable window and max requests
-- Cleans up old entries
+- In-memory rate limiter (per user, configurable window/max)
+- Auto-cleanup every hour to prevent memory leaks
 
 **stateManager.js:**
 
-- Loads/saves state.json
-- Tracks last sent article
-- Atomic file operations
-- Error handling
+- Atomic file operations for `state.json` (write to temp, then rename)
+- Tracks `lastArticle` number for duplicate prevention
+
+**openaiSecurity.js:**
+
+- `validateModel()` — checks against ALLOWED_MODELS whitelist
+- `validateMaxTokens()` — enforces absolute token cap (8000)
+- `validatePromptLength()` — prevents oversized prompts
+- `sanitizeContent()` — removes control characters, normalizes whitespace
+- `calculateCost()` — estimates API cost from token usage
 
 #### Scheduler Module (`scheduler/`)
 
@@ -319,16 +378,16 @@ Explain how data flows through the system:
    └─> telegramService.checkAndSend()
        ├─> Load state (stateManager)
        ├─> Get latest article URL (scraper)
-       ├─> Compare with last sent
+       ├─> Compare article number with state.lastArticle
        │
        ├─> If new:
-       │   ├─> Parse article (articleService)
-       │   ├─> Format message
-       │   ├─> Send to chat
+       │   ├─> Parse React section (articleService)
+       │   ├─> Index articles for search (searchService, non-blocking)
+       │   ├─> Send formatted message
        │   └─> Save state
        │
        └─> If not new:
-           └─> Do nothing
+           └─> Log and do nothing
 ```
 
 #### Manual Article Fetch Flow (`/article 260`)
@@ -337,34 +396,57 @@ Explain how data flows through the system:
 1. User sends: /article 260
    └─> Telegraf receives message
 
-2. Middleware Chain
-   └─> rateLimitMiddleware()
-       ├─> Check rate limit
-       ├─> If exceeded: send error, stop
-       └─> If ok: continue
+2. Middleware: rateLimitMiddleware() → errorHandler
 
-3. Command Handler (handlers/commands.js)
-   └─> Parse command arguments
-       ├─> Validate article number
-       ├─> If invalid: send error, stop
-       └─> If valid: continue
+3. Handler: parse args → validateArticleNumber()
 
-4. Service Layer
+4. Service chain:
    └─> articleService.getArticle(260)
-       ├─> scraper.getArticleUrl(260)
-       ├─> scraper.fetch(url)
-       ├─> Parse HTML with Cheerio
-       ├─> Extract React section
-       ├─> Format for Telegram
-       └─> Return formatted text
+       ├─> scraper.fetch(validated URL)
+       ├─> _findReactSection (3 strategies)
+       ├─> _extractFeatured + _extractItems
+       └─> _formatMessage + truncate
+   └─> searchService.indexArticles() (non-blocking, won't fail command)
 
-5. Response
-   └─> Send message to user via ctx.reply()
+5. ctx.reply(formattedText)
+```
 
-6. Error Handling
-   └─> If any step fails:
-       ├─> Log detailed error server-side
-       └─> Send user-friendly message
+#### AI Digest Flow (`/digest 260`)
+
+```
+1. User sends: /digest 260
+
+2. Middleware: rateLimitMiddleware() → check OPENAI_API_KEY exists
+
+3. Service chain:
+   └─> articleService.getReactSectionData(260)
+       └─> Returns structured data: { featured, items[] }
+   └─> searchService.indexArticles() (non-blocking)
+   └─> openaiService.createReactDigest(data, progressCallback)
+       ├─> For each article: scraper.fetchExternal(url) → extractArticleContent()
+       ├─> Build prompt with all article content
+       ├─> Validate model, tokens, prompt length (openaiSecurity)
+       ├─> Send to OpenAI API (with retry/backoff on rate limits)
+       └─> Return digest text + usage stats
+
+4. Split digest into chunks if > 4000 chars, send each
+5. Log token usage and cost in dev mode
+```
+
+#### Search Flow (`/search hooks`)
+
+```
+1. User sends: /search hooks
+
+2. Middleware: rateLimitMiddleware()
+
+3. Validate query (min 2 chars, max 100 chars)
+
+4. searchService.search("hooks", 10)
+   └─> SQLite FTS5 query on articles_fts table
+   └─> Returns results with relevance scores
+
+5. Format results with icons (⭐ featured, 📄 regular) and scores
 ```
 
 ### Step 5: Configuration
@@ -383,6 +465,7 @@ Required:
 
 Optional:
 
+- `OPENAI_API_KEY` - Enables `/digest` command (must start with "sk-")
 - `ALLOWED_USER_IDS` - Comma-separated user IDs for `/now` command
 - `NODE_ENV` - "production" or "development"
 
@@ -396,10 +479,12 @@ Includes:
 
 - HTTP_TIMEOUT - Request timeout (10 seconds)
 - MAX_RESPONSE_SIZE - Max HTML size (5MB)
-- RATE_LIMIT_WINDOW - Time window (60 seconds)
+- RATE_LIMIT_WINDOW - Time window (5 minutes)
 - RATE_LIMIT_MAX_REQUESTS - Max requests per window (3)
 - CRON_SCHEDULE - When to check ("0 10 \* \* 4" = Thu 10:00)
-- STATE_FILE_PATH - Where to save state
+- STATE_FILE / SEARCH_DB_PATH - File paths
+- ARTICLES_TO_SKIP / ARTICLES_TO_SKIP_AI - Filter emojis
+- OPENAI - Nested config: allowed models, token limits, pricing, retry config
 
 ### Step 6: Security Features
 
@@ -423,9 +508,9 @@ Read: {baseDir}/utils/rateLimiter.js
 ```
 
 - In-memory rate limiter
-- 3 requests per minute per user
+- 3 requests per 5 minutes per user
 - Prevents abuse and spam
-- Applied to user-facing commands
+- Applied to all user-facing commands
 
 **3. Authorization:**
 
@@ -462,9 +547,22 @@ Read: {baseDir}/config/env.js
 ```
 
 - Required variables checked on startup
-- Token format validated
-- Chat ID format validated
+- BOT_TOKEN format validated
+- OPENAI_API_KEY format validated (if provided)
 - Fails fast if misconfigured
+
+**7. OpenAI Security:**
+
+```bash
+Read: {baseDir}/utils/openaiSecurity.js
+```
+
+- Model whitelist (prevents model injection)
+- Token limits with absolute cap (8000 tokens max)
+- Prompt length validation (200K chars max)
+- Content sanitization (control chars removed)
+- API key sanitized in all log output
+- Cost calculation and tracking
 
 ### Step 7: Development Workflow
 
@@ -503,6 +601,8 @@ bun dev
 # Then test commands in Telegram:
 # /start
 # /article 260
+# /digest 260  (requires OPENAI_API_KEY)
+# /search hooks
 ```
 
 **Debugging:**
@@ -596,14 +696,20 @@ Highlight the most important files:
 **Must understand:**
 
 1. `{baseDir}/index.js` - Entry point, initialization
-2. `{baseDir}/handlers/commands.js` - All commands
-3. `{baseDir}/services/articleService.js` - Core scraping logic
-4. `{baseDir}/ARCHITECTURE.md` - Design principles
-5. `{baseDir}/CLAUDE.md` - Development guidelines
+2. `{baseDir}/handlers/commands.js` - All commands (5 commands)
+3. `{baseDir}/services/articleService.js` - Core scraping logic (most fragile)
+4. `{baseDir}/services/openaiService.js` - AI digest generation
+5. `{baseDir}/services/searchService.js` - Full-text search
+6. `{baseDir}/.claude/CLAUDE.md` - Development guidelines
 
-**Configuration:** 6. `{baseDir}/config/env.js` - Environment setup 7. `{baseDir}/config/constants.js` - Application constants 8. `{baseDir}/.env.example` - Environment template
+**Configuration:**
+7. `{baseDir}/config/env.js` - Environment setup
+8. `{baseDir}/config/constants.js` - Application constants (incl. OpenAI limits)
 
-**Security:** 9. `{baseDir}/utils/urlValidator.js` - SSRF protection 10. `{baseDir}/middleware/auth.js` - Authorization 11. `{baseDir}/docs/SECURITY.md` - Security documentation
+**Security:**
+9. `{baseDir}/utils/urlValidator.js` - SSRF protection
+10. `{baseDir}/utils/openaiSecurity.js` - OpenAI security
+11. `{baseDir}/middleware/auth.js` - Authorization
 
 ## Output Format
 
@@ -626,11 +732,11 @@ Provide structured overview:
 
 ## Key Components
 
-1. **Services** - Business logic (scraper, article parser, telegram operations)
-2. **Handlers** - Command definitions and routing
+1. **Services** - Business logic (scraper, article parser, telegram, OpenAI digest, search)
+2. **Handlers** - Command definitions and routing (5 commands)
 3. **Middleware** - Cross-cutting concerns (auth, rate limits, errors)
-4. **Utils** - Reusable utilities
-5. **Config** - Configuration and environment
+4. **Utils** - Reusable utilities (errors, validators, security)
+5. **Config** - Configuration and environment (incl. OpenAI limits)
 
 ## Data Flow
 
@@ -639,9 +745,10 @@ Provide structured overview:
 ## Security Features
 
 - SSRF protection via URL whitelist
-- Rate limiting (3 req/min)
+- Rate limiting (3 req / 5 min per user)
 - Authorization for admin commands
 - Input validation throughout
+- OpenAI security (model whitelist, token caps, content sanitization)
 - No secrets in code
 
 ## Getting Started

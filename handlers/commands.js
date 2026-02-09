@@ -1,6 +1,6 @@
 const telegramService = require("../services/telegramService");
 const articleService = require("../services/articleService");
-const openaiService = require("../services/openaiService");
+const searchService = require("../services/searchService");
 const { isAuthorized } = require("../middleware/auth");
 const rateLimitMiddleware = require("../middleware/rateLimit");
 const {
@@ -9,7 +9,7 @@ const {
 } = require("../utils/validators");
 const { OPENAI_API_KEY, NODE_ENV } = require("../config/env");
 const { calculateCost } = require("../utils/openaiSecurity");
-const { logInfo } = require("../utils/logger");
+const { logInfo, logError } = require("../utils/logger");
 
 /**
  * Register all bot commands with their middleware and handlers
@@ -19,6 +19,7 @@ const { logInfo } = require("../utils/logger");
  * - /now - Manual check for new articles (auth + rate limit)
  * - /article <number> - Fetch specific article (rate limit)
  * - /digest <number> - Generate detailed AI digest of React section (rate limit)
+ * - /search <query> - Search articles by keyword (rate limit)
  */
 function registerCommands() {
   const bot = telegramService.getBot();
@@ -69,13 +70,26 @@ function registerCommands() {
       const articleNumber = validation.value;
 
       await ctx.reply(`Fetching article #${articleNumber}, please wait…`);
-      const messageTextResult = await articleService.getArticle(articleNumber);
+      const { text: messageTextResult, data: reactSectionData } = await articleService.getArticleWithData(articleNumber);
+
+      // Index article for search (non-blocking, don't fail if it errors)
+      try {
+        const indexedCount = await searchService.indexArticles(
+          reactSectionData
+        );
+        if (indexedCount > 0) {
+          logInfo(`Indexed ${indexedCount} articles from issue #${articleNumber}`);
+        }
+      } catch (indexErr) {
+        // Don't fail the command if indexing fails
+        logError("Failed to index articles:", indexErr.message);
+      }
+
       await ctx.reply(messageTextResult, {
         disable_web_page_preview: false,
       });
     } catch (err) {
-      console.error(`Error in /article command:`, err.message);
-      console.error("Full error:", err);
+      logError("Error in /article command:", err);
 
       // Provide user-friendly error message
       const errorMessage = err.message || "Unknown error occurred";
@@ -95,7 +109,8 @@ function registerCommands() {
       return;
     }
 
-    const args = parseCommandArgs(ctx.message.text);
+    const messageText = ctx.message?.text || "";
+    const args = parseCommandArgs(messageText);
 
     if (args.length < 1) {
       await ctx.reply(
@@ -115,10 +130,23 @@ function registerCommands() {
     try {
       await ctx.reply(`📚 Fetching article #${articleNumber}...`);
 
-      // Get raw React section data
-      const reactSectionData = await articleService.getReactSectionData(
+      // Get article text and structured data in a single fetch
+      const { data: reactSectionData } = await articleService.getArticleWithData(
         articleNumber
       );
+
+      // Index articles for search (non-blocking, don't fail if it errors)
+      try {
+        const indexedCount = await searchService.indexArticles(
+          reactSectionData
+        );
+        if (indexedCount > 0) {
+          logInfo(`Indexed ${indexedCount} articles from issue #${articleNumber}`);
+        }
+      } catch (indexErr) {
+        // Don't fail the command if indexing fails
+        logError("Failed to index articles:", indexErr.message);
+      }
 
       // Count total articles to fetch
       const totalArticles =
@@ -134,9 +162,13 @@ function registerCommands() {
         `📥 Fetching content from ${totalArticles} article(s)... This may take a moment.`
       );
 
+      // OpenAI service is loaded lazily to keep OPENAI optional for bot startup.
+      // If OPENAI_API_KEY is missing, we exit early above before loading the module.
+      const openaiService = require("../services/openaiService");
+
       // Progress callback to log progress (simplified - no Telegram updates during fetch)
       const progressCallback = (message) => {
-        console.log(`[Digest Progress] ${message}`);
+        logInfo(`[Digest Progress] ${message}`);
       };
 
       // Generate digest using OpenAI (fetches and parses all articles)
@@ -216,15 +248,83 @@ function registerCommands() {
         logInfo("=".repeat(60) + "\n");
       }
     } catch (err) {
-      console.error(
-        `Error generating digest for article #${articleNumber}:`,
-        err.message
-      );
-      console.error("Full error:", err);
+      logError(`Error generating digest for article #${articleNumber}:`, err);
 
       // Provide user-friendly error message
       const errorMessage =
         err.message || "Failed to generate digest. Please try again.";
+      await ctx.reply(`❌ ${errorMessage}`);
+    }
+  });
+
+  // /search command - search articles by keyword
+  bot.command("search", rateLimitMiddleware(), async (ctx) => {
+    try {
+      const messageText = ctx.message?.text || "";
+      const args = parseCommandArgs(messageText);
+
+      if (args.length < 1) {
+        await ctx.reply(
+          "Usage: /search <query>\n\nExample: /search hooks\n\nSearches through all indexed React articles by keyword."
+        );
+        return;
+      }
+
+      const query = args.join(" ").trim();
+
+      // Validate query length
+      if (query.length < 2) {
+        await ctx.reply("❌ Search query must be at least 2 characters long.");
+        return;
+      }
+
+      if (query.length > 100) {
+        await ctx.reply("❌ Search query is too long (max 100 characters).");
+        return;
+      }
+
+      await ctx.reply(`🔍 Searching for "${query}"...`);
+
+      // Perform search
+      const results = await searchService.search(query, 10);
+
+      if (results.length === 0) {
+        await ctx.reply(
+          `❌ No articles found matching "${query}".\n\nTry different keywords or check if articles are indexed.`
+        );
+        return;
+      }
+
+      // Format results
+      let response = `📚 Found ${results.length} article(s) matching "${query}":\n\n`;
+
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        const typeIcon = result.type === "featured" ? "⭐" : "📄";
+        const scoreEmoji =
+          result.score >= 70 ? "🟢" : result.score >= 40 ? "🟡" : "⚪";
+
+        response += `${i + 1}. ${typeIcon} ${result.title}\n`;
+        response += `   Issue #${
+          result.issueNumber
+        } | Score: ${scoreEmoji} ${Math.round(result.score)}%\n`;
+        response += `   ${result.url}\n\n`;
+
+        // Telegram message limit is 4096 characters
+        // If response is getting long, send what we have and continue
+        if (response.length > 3500 && i < results.length - 1) {
+          await ctx.reply(response);
+          response = `📚 (continued):\n\n`;
+        }
+      }
+
+      // Send response
+      await ctx.reply(response.trim());
+    } catch (err) {
+      logError("Error in /search command:", err);
+
+      const errorMessage =
+        err.message || "Failed to search articles. Please try again.";
       await ctx.reply(`❌ ${errorMessage}`);
     }
   });

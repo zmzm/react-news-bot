@@ -61,7 +61,7 @@ Based on the test output, categorize the issue:
 - Selector no longer matches the heading
 - Content uses different heading text
 
-**Next Steps:** Go to Step 4 (HTML Structure Analysis)
+**Next Steps:** Go to Step 4 (HTML Structure Analysis), then use the `migrate-selectors` skill for the actual fix.
 
 #### Issue Type B: "Article not found (404)"
 
@@ -74,7 +74,7 @@ Based on the test output, categorize the issue:
 ```bash
 # Verify URL construction
 Read: {baseDir}/services/scraper.js
-# Check line 64-71 for getArticleUrl() method
+# Look for getArticleUrl() method
 ```
 
 **Solutions:**
@@ -113,7 +113,7 @@ Read: {baseDir}/utils/urlValidator.js
 - Cheerio selectors returning unexpected data
 - Malformed HTML
 
-**Next Steps:** Go to Step 4 (HTML Structure Analysis)
+**Next Steps:** Go to Step 4 (HTML Structure Analysis), then use the `migrate-selectors` skill for the actual fix.
 
 ### Step 4: HTML Structure Analysis
 
@@ -125,9 +125,9 @@ Read: {baseDir}/services/articleService.js
 ```
 
 Key areas to check:
-- Line ~42-50: React section heading selector
-- Line ~52-65: Featured articles extraction
-- Line ~67-80: List items extraction
+- `_findReactSection()`: Multi-strategy heading finder (3 fallbacks)
+- `_extractFeatured()`: Featured article extraction
+- `_extractItems()`: Item list extraction (walks siblings until next h2)
 
 **Inspect the selectors:**
 ```javascript
@@ -399,6 +399,10 @@ module.exports = {
 };
 ```
 
+## Related Skills
+
+After diagnosing the issue, use the **`migrate-selectors`** skill for a guided process to update Cheerio selectors with backward compatibility across article ranges.
+
 ## Code References
 
 - Article parsing: `{baseDir}/services/articleService.js`
@@ -406,4 +410,3 @@ module.exports = {
 - Test script: `{baseDir}/scripts/test-article.js`
 - URL validation: `{baseDir}/utils/urlValidator.js`
 - Timeout config: `{baseDir}/config/constants.js`
-- Architecture: `{baseDir}/ARCHITECTURE.md`
