@@ -5,6 +5,7 @@ if (process.stdout && process.stdout.isTTY) {
 }
 
 const telegramService = require("./services/telegramService");
+const opsService = require("./services/opsService");
 const { registerCommands } = require("./handlers/commands");
 const errorHandler = require("./middleware/errorHandler");
 const { startScheduler } = require("./scheduler/cron");
@@ -40,6 +41,7 @@ async function gracefulShutdown(signal) {
   logInfo(`\nReceived ${signal}, shutting down gracefully...`);
 
   try {
+    await opsService.stop();
     await telegramService.stop(signal);
     logInfo("Bot stopped successfully");
 
@@ -73,6 +75,10 @@ async function start() {
 
     // Launch bot AFTER logging messages
     await telegramService.launch();
+
+    // Start ops endpoints/heartbeat after bot is online
+    await opsService.startHealthServer();
+    opsService.startHeartbeat();
   } catch (err) {
     logError("Failed to launch bot:", err);
     process.exit(1);

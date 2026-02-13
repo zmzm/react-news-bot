@@ -4,6 +4,7 @@ const articleService = require("./articleService");
 const searchService = require("./searchService");
 const scraper = require("./scraper");
 const stateManager = require("../utils/stateManager");
+const observability = require("./observabilityService");
 const { logInfo, logError } = require("../utils/logger");
 
 /**
@@ -34,10 +35,15 @@ class TelegramService {
    */
   async sendMessage(ctx, text, options = {}) {
     const truncatedText = articleService.truncateMessage(text);
-    await ctx.reply(truncatedText, {
-      disable_web_page_preview: false,
-      ...options,
-    });
+    try {
+      await ctx.reply(truncatedText, {
+        disable_web_page_preview: false,
+        ...options,
+      });
+    } catch (err) {
+      observability.incSendFailure();
+      throw err;
+    }
   }
 
   /**
@@ -48,10 +54,15 @@ class TelegramService {
    */
   async sendMessageToChat(chatId, text, options = {}) {
     const truncatedText = articleService.truncateMessage(text);
-    await this.bot.telegram.sendMessage(chatId, truncatedText, {
-      disable_web_page_preview: false,
-      ...options,
-    });
+    try {
+      await this.bot.telegram.sendMessage(chatId, truncatedText, {
+        disable_web_page_preview: false,
+        ...options,
+      });
+    } catch (err) {
+      observability.incSendFailure();
+      throw err;
+    }
   }
 
   /**
@@ -92,14 +103,7 @@ class TelegramService {
 
       // Index articles for search (non-blocking, don't fail if it errors)
       try {
-        const indexedCount = await searchService.indexArticles(
-          reactSectionData
-        );
-        if (indexedCount > 0) {
-          logInfo(
-            `Indexed ${indexedCount} articles from issue #${currentArticleNumber}`
-          );
-        }
+        await searchService.indexArticles(reactSectionData);
       } catch (indexErr) {
         // Don't fail the whole operation if indexing fails
         logError("Failed to index articles:", indexErr);

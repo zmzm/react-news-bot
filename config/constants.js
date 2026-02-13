@@ -4,10 +4,12 @@ module.exports = {
   // File paths
   STATE_FILE: path.join(__dirname, "..", "state.json"),
   SEARCH_DB_PATH: path.join(__dirname, "..", "data", "search.db"),
+  DIGEST_CACHE_FILE: path.join(__dirname, "..", "data", "digest-cache.json"),
+  SCHEDULER_LOCK_FILE: path.join(__dirname, "..", "data", "scheduler.lock"),
 
   // Rate limiting
   RATE_LIMIT_WINDOW: 5 * 60 * 1000, // 5 minutes
-  RATE_LIMIT_MAX_REQUESTS: 3,
+  RATE_LIMIT_MAX_REQUESTS: 15,
 
   // HTTP client configuration
   HTTP_TIMEOUT: 10000, // 10 seconds
@@ -25,6 +27,10 @@ module.exports = {
 
   // Cron schedule
   CRON_SCHEDULE: "0 10 * * 4", // Every Thursday at 10:00
+  SCHEDULER_LOCK_TTL_MS: 15 * 60 * 1000, // 15 minutes
+
+  // Digest cache
+  DIGEST_CACHE_MAX_ENTRIES: 200,
 
   // OpenAI API security limits
   OPENAI: {

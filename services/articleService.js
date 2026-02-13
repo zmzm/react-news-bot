@@ -10,6 +10,7 @@ const {
 } = require("../config/constants");
 const scraper = require("./scraper");
 const { logInfo, logError } = require("../utils/logger");
+const observability = require("./observabilityService");
 const {
   ParsingError,
   NotFoundError,
@@ -263,10 +264,12 @@ class ArticleService {
    * @private
    */
   _parseReactSectionFromDom($, validatedUrl) {
+    observability.incParseAttempt();
     const title = $("h1").first().text().trim() || "This Week In React";
     const reactHeading = this._ensureReactHeading($);
     const featured = this._extractFeatured($, reactHeading, validatedUrl);
     const items = this._extractItems($, reactHeading, validatedUrl);
+    observability.incParseSuccess();
 
     return {
       title,

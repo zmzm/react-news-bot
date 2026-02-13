@@ -398,21 +398,21 @@ class OpenAIService {
 Task: Analyze ONLY the React section content below. Exclude React Native, jobs, sponsors, tours.
 
 For EACH item, provide:
-- Summary (3 - 5 sentences)
-- Key takeaways (bullet points)
-- Usefulness assessment for React developers
+- Summary (2-4 short sentences)
+- Key takeaways (2-4 bullet points)
 - Recommendation: Read fully / Summary sufficient
 
 Preserve original order. Use clear, neutral, practical tone.
 
 Output format (repeat for each item):
 
-Title
-- Summary
-- Key takeaways:
-  - bullet point
-  - bullet point
-- Recommendation: Read fully / Summary is sufficient
+Item N: <title>
+Summary: ...
+Key takeaways:
+- ...
+- ...
+Recommendation: Read fully | Summary sufficient
+---
 
 React Section Content:
 <article-content>
@@ -444,21 +444,21 @@ ${contentList}
 Task: Analyze ONLY the React section content below. Exclude React Native, jobs, sponsors, tours.
 
 For EACH item, provide:
-- Summary (3-5 sentences)
-- Key takeaways (bullet points)
-- Usefulness assessment for React developers
+- Summary (2-4 short sentences)
+- Key takeaways (2-4 bullet points)
 - Recommendation: Read fully / Summary sufficient
 
 Preserve original order. Use clear, neutral, practical tone.
 
 Output format (repeat for each item):
 
-Title
-- Summary
-- Key takeaways:
-  - bullet point
-  - bullet point
-- Recommendation: Read fully / Summary is sufficient
+Item N: <title>
+Summary: ...
+Key takeaways:
+- ...
+- ...
+Recommendation: Read fully | Summary sufficient
+---
 
 React Section Content:
 <article-content>

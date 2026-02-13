@@ -1,23 +1,79 @@
 /**
  * Logging utility with immediate flush support for Bun watch mode
  */
+const LOG_FORMAT = (process.env.LOG_FORMAT || "json").toLowerCase();
 
 /**
  * Log info message with immediate flush (for Bun watch mode compatibility)
  * @param {string} message - Message to log
+ * @param {any} [meta] - Optional metadata
  */
-function logInfo(message) {
-  // Use console.log for informational messages
-  console.log(message);
+function logInfo(message, meta) {
+  writeLog("info", message, meta);
+}
 
-  // Force flush stdout if available (works in Node.js)
+function sanitize(value) {
+  if (value === undefined || value === null) return value;
+  if (typeof value === "string") return sanitizeApiKey(value);
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: sanitizeApiKey(value.message || String(value)),
+      stack:
+        process.env.NODE_ENV === "development" && value.stack
+          ? sanitizeApiKey(value.stack)
+          : undefined,
+    };
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitize(item));
+  }
+  if (typeof value === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = sanitize(v);
+    }
+    return out;
+  }
+  return sanitizeApiKey(String(value));
+}
+
+function writeLog(level, message, meta) {
+  const safeMessage = sanitizeApiKey(String(message));
+  const safeMeta = meta === undefined ? undefined : sanitize(meta);
+
+  if (LOG_FORMAT === "json") {
+    const payload = {
+      timestamp: new Date().toISOString(),
+      level,
+      message: safeMessage,
+      ...(safeMeta !== undefined ? { meta: safeMeta } : {}),
+    };
+    const line = JSON.stringify(payload);
+    if (level === "error") {
+      console.error(line);
+    } else {
+      console.log(line);
+    }
+  } else {
+    if (safeMeta !== undefined) {
+      if (level === "error") {
+        console.error(`${safeMessage} ${JSON.stringify(safeMeta)}`);
+      } else {
+        console.log(`${safeMessage} ${JSON.stringify(safeMeta)}`);
+      }
+    } else if (level === "error") {
+      console.error(safeMessage);
+    } else {
+      console.log(safeMessage);
+    }
+  }
+
   if (process.stdout && typeof process.stdout.flush === "function") {
     process.stdout.flush();
   }
-
-  // For Bun, ensure output is written immediately
   if (typeof Bun !== "undefined" && process.stdout) {
-    // Bun handles this automatically, but we ensure it's written
     process.stdout.write("");
   }
 }
@@ -37,30 +93,10 @@ function sanitizeApiKey(text) {
 /**
  * Log error message
  * @param {string} message - Error message
- * @param {Error|string} [error] - Optional error object or string
+ * @param {Error|string|any} [error] - Optional error object or metadata
  */
 function logError(message, error) {
-  // Sanitize error messages to prevent API key leakage
-  const safeMessage = sanitizeApiKey(message);
-  console.error(safeMessage);
-
-  if (error) {
-    // If error is a string, sanitize it
-    if (typeof error === "string") {
-      console.error(sanitizeApiKey(error));
-    } else if (error instanceof Error) {
-      // For Error objects, sanitize the message
-      const safeError = sanitizeApiKey(error.message || String(error));
-      console.error(safeError);
-      // Only log stack trace in development
-      if (process.env.NODE_ENV === "development" && error.stack) {
-        console.error(sanitizeApiKey(error.stack));
-      }
-    } else {
-      // For other types, convert to string and sanitize
-      console.error(sanitizeApiKey(String(error)));
-    }
-  }
+  writeLog("error", message, error);
 }
 
 /**

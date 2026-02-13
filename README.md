@@ -9,6 +9,7 @@ A Telegram bot that automatically sends the React section from "This Week In Rea
 - 📚 Generate detailed article digests (`/digest <number>`) - AI-powered summaries with key takeaways
 - 🔍 Search articles by keyword (`/search <query>`) - Fast keyword search across all indexed articles
 - 🔒 Security features (rate limiting, URL validation, SSRF protection)
+- 📈 Observability: JSON logs, runtime metrics, health endpoint, optional heartbeat
 - 🔄 Hot reload for development (Bun watch mode or nodemon)
 - 🛡️ Robust error handling with custom error classes
 - 📝 Comprehensive logging and error reporting
@@ -92,10 +93,14 @@ pnpm node:start
 ## Commands
 
 - `/start` - Check if the bot is alive
+- `/help` - Show available commands
+- `/status` - Show operational status (scheduler/index/state)
+- `/status` - Show operational status (scheduler/index/state/metrics)
 - `/now` - Manually check for new articles (may require authorization)
 - `/article <number>` - Get a specific article by number (e.g., `/article 260`)
 - `/digest <number>` - Generate detailed AI-powered digest of React section with summaries, key takeaways, and recommendations (requires OpenAI API key)
 - `/search <query>` - Search articles by keyword across all indexed React articles (e.g., `/search hooks`)
+  - Supports filters: `#262`, `issue:262`, `since:250`, `featured`, `type:item`, `limit:5`
 
 ## Development
 
@@ -148,10 +153,40 @@ thisweekinreact-bot/
 ### Optional
 
 - `OPENAI_API_KEY` - Your OpenAI API key (optional, required only for `/digest` command). Get one at https://platform.openai.com/api-keys
-- `ALLOWED_USER_IDS` - Comma-separated list of user IDs allowed to use `/now` command (default: all users allowed)
+- `ALLOWED_USER_IDS` - Comma-separated list of user IDs allowed to use bot commands. If empty, all users are allowed.
 - `TARGET_CHAT_IDS` - Comma-separated chat IDs for scheduled auto-delivery. If empty, scheduler checks for updates but does not auto-send.
+- `HEARTBEAT_CHAT_IDS` - Comma-separated chat IDs for periodic heartbeat messages (optional)
+- `HEARTBEAT_INTERVAL_MINUTES` - Heartbeat cadence in minutes; `0` disables (default: `0`)
 - `CRON_TIMEZONE` - IANA timezone for scheduler (default: `UTC`, example: `America/New_York`)
+- `HEALTH_HOST` - Health endpoint bind host (default: `0.0.0.0`)
+- `HEALTH_PORT` - Health endpoint port (default: `3001`, set `0` to disable)
+- `LOG_FORMAT` - `json` or `text` logs (default: `json`)
 - `NODE_ENV` - Set to `production` for production mode (default: `development`)
+
+## Observability
+
+- Health endpoint: `GET /health`
+- Metrics endpoint: `GET /metrics`
+- `/status` includes key runtime metrics:
+  - `parse_success_rate`
+  - `digest_duration_ms_avg`
+  - `send_failures_total`
+
+## Docker
+
+Build image:
+
+```bash
+docker build -t thisweekinreact-bot .
+```
+
+Run container:
+
+```bash
+docker run --env-file .env -p 3001:3001 thisweekinreact-bot
+```
+
+Container healthcheck uses the app's `/health` endpoint.
 
 ## Troubleshooting
 
@@ -183,6 +218,11 @@ The `/search` command uses a SQLite database with FTS5 for fast keyword search. 
 To build the search index for existing articles, you can manually fetch articles using `/article <number>` or wait for the automatic indexing when new articles arrive.
 
 The search database is stored in `data/search.db` and is automatically created on first use.
+
+### Digest Cache
+
+The `/digest` command caches generated digests by issue and model in `data/digest-cache.json`.  
+Repeated requests for the same issue return cached output to reduce latency and OpenAI costs.
 
 ### Common Issues
 

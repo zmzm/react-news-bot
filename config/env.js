@@ -62,6 +62,26 @@ function validateEnv() {
       process.exit(1);
     }
   }
+
+  // Validate health port (optional, 0 disables health server)
+  if (process.env.HEALTH_PORT !== undefined) {
+    const port = Number(process.env.HEALTH_PORT);
+    if (!Number.isInteger(port) || port < 0 || port > 65535) {
+      console.error("❌ Invalid HEALTH_PORT. Must be an integer between 0 and 65535.");
+      process.exit(1);
+    }
+  }
+
+  // Validate heartbeat interval (optional)
+  if (process.env.HEARTBEAT_INTERVAL_MINUTES !== undefined) {
+    const minutes = Number(process.env.HEARTBEAT_INTERVAL_MINUTES);
+    if (!Number.isInteger(minutes) || minutes < 0 || minutes > 1440) {
+      console.error(
+        "❌ Invalid HEARTBEAT_INTERVAL_MINUTES. Must be an integer between 0 and 1440."
+      );
+      process.exit(1);
+    }
+  }
 }
 
 validateEnv();
@@ -79,6 +99,18 @@ module.exports = {
         .map((id) => id.trim())
         .filter(Boolean)
     : [],
+  HEARTBEAT_CHAT_IDS: process.env.HEARTBEAT_CHAT_IDS
+    ? process.env.HEARTBEAT_CHAT_IDS.split(",")
+        .map((id) => id.trim())
+        .filter(Boolean)
+    : [],
+  HEARTBEAT_INTERVAL_MINUTES: process.env.HEARTBEAT_INTERVAL_MINUTES
+    ? Number(process.env.HEARTBEAT_INTERVAL_MINUTES)
+    : 0,
+  HEALTH_HOST: process.env.HEALTH_HOST || "0.0.0.0",
+  HEALTH_PORT:
+    process.env.HEALTH_PORT !== undefined ? Number(process.env.HEALTH_PORT) : 3001,
   CRON_TIMEZONE: process.env.CRON_TIMEZONE || "UTC",
+  LOG_FORMAT: process.env.LOG_FORMAT || "json",
   NODE_ENV: process.env.NODE_ENV || "development",
 };
