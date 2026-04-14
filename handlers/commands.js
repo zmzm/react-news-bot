@@ -12,7 +12,7 @@ const {
   parseCommandArgs,
   parseSearchQuery,
 } = require("../utils/validators");
-const { OPENAI_API_KEY, NODE_ENV } = require("../config/env");
+const { OPENAI_API_KEY, NODE_ENV, OBSIDIAN_VAULT_PATH } = require("../config/env");
 const { calculateCost } = require("../utils/openaiSecurity");
 const { logInfo, logError } = require("../utils/logger");
 
@@ -177,10 +177,71 @@ function highlightText(text, query) {
  * - /now - Manual check for new articles (auth + rate limit)
  * - /article <number> - Fetch specific article (rate limit)
  * - /digest <number> - Generate detailed AI digest of React section (rate limit)
+ * - /obsidian <number> [--overwrite] - Generate Obsidian bundle (MOC + articles) and save to vault (rate limit)
  * - /search <query> - Search articles by keyword (rate limit)
  */
 function registerCommands() {
   const bot = telegramService.getBot();
+  const obsidianService = require("../services/obsidianService");
+
+  const generateObsidianBundle = async (
+    ctx,
+    articleNumber,
+    { overwrite = false, announceResult = true } = {}
+  ) => {
+    const updateProgress = await createProgressUpdater(
+      ctx,
+      `🗒️ Obsidian #${articleNumber}: fetching newsletter issue...`
+    );
+
+    const { data: reactSectionData } = await articleService.getArticleWithData(
+      articleNumber
+    );
+
+    try {
+      await searchService.indexArticles(reactSectionData);
+    } catch (indexErr) {
+      logError("Failed to index articles:", indexErr.message);
+    }
+
+    const totalArticles =
+      (reactSectionData.featured ? 1 : 0) +
+      (reactSectionData.items?.length || 0);
+    if (totalArticles === 0) {
+      throw new Error("No articles found in the React section.");
+    }
+
+    const openaiService = require("../services/openaiService");
+    await updateProgress(
+      `🧠 Obsidian #${articleNumber}: generating digest-style notes...`,
+      true
+    );
+    const digestPayload = await openaiService.generateIssueNotes(reactSectionData);
+    const notePayload = await obsidianService.enrichIssueNotesWithFullContent(
+      digestPayload,
+      updateProgress
+    );
+
+    await updateProgress(
+      `💾 Obsidian #${articleNumber}: rendering and saving markdown...`,
+      true
+    );
+
+    const saveResult = await obsidianService.saveIssueBundle(
+      OBSIDIAN_VAULT_PATH,
+      notePayload,
+      { overwrite }
+    );
+
+    await updateProgress(`✅ Obsidian #${articleNumber}: done.`, true);
+    if (announceResult) {
+      await ctx.reply(
+        `✅ Obsidian bundle ${saveResult.existed ? "updated" : "created"} for issue #${articleNumber}\nFolder: ${saveResult.issueDir}\nMain note: ${saveResult.mocPath}\nArticles: ${saveResult.itemPaths.length}`
+      );
+    }
+
+    return saveResult;
+  };
 
   bot.start(async (ctx) => {
     if (await rejectIfUnauthorized(ctx)) return;
@@ -200,6 +261,7 @@ function registerCommands() {
       "/now - Manually check latest issue (authorized users)",
       "/article <number> - Send React section of specific issue",
       "/digest <number> - Generate AI digest for issue",
+      "/obsidian <number> [--overwrite] - Generate MOC + article notes in Obsidian",
       '/search <query> - Search indexed titles (example: /search hooks)',
     ].join("\n");
 
@@ -452,6 +514,49 @@ function registerCommands() {
       await ctx.reply(`❌ ${errorMessage}`);
     } finally {
       observability.recordDigestDuration(Date.now() - digestStartedAt);
+    }
+  });
+
+  bot.command("obsidian", rateLimitMiddleware(), async (ctx) => {
+    const messageText = ctx.message?.text || "";
+
+    if (await rejectIfUnauthorized(ctx)) return;
+    if (!OPENAI_API_KEY) {
+      await ctx.reply(
+        "❌ OpenAI integration is not configured. Please set OPENAI_API_KEY in your environment variables."
+      );
+      return;
+    }
+    if (!OBSIDIAN_VAULT_PATH) {
+      await ctx.reply(
+        "❌ OBSIDIAN_VAULT_PATH is not configured. Set it in your environment variables."
+      );
+      return;
+    }
+    const args = parseCommandArgs(messageText);
+
+    if (args.length < 1) {
+      await ctx.reply(
+        "Usage: /obsidian <article_number> [--overwrite]\n\nCreates: <vault>/TWIR/<issue>/MOC.md + articles/*.md\n\nExamples:\n/obsidian 260\n/obsidian 260 --overwrite"
+      );
+      return;
+    }
+
+    const overwrite = args.includes("--overwrite");
+    const articleArg = args.find((arg) => !arg.startsWith("--"));
+    const validation = validateArticleNumber(articleArg);
+    if (!validation.valid) {
+      await ctx.reply(`❌ ${validation.error}\n\nExample: /obsidian 260`);
+      return;
+    }
+
+    const articleNumber = validation.value;
+
+    try {
+      await generateObsidianBundle(ctx, articleNumber, { overwrite });
+    } catch (err) {
+      logError(`Error generating Obsidian note for article #${articleNumber}:`, err);
+      await ctx.reply(`❌ ${err.message || "Failed to generate Obsidian note."}`);
     }
   });
 

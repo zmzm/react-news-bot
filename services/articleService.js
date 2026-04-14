@@ -183,12 +183,16 @@ class ArticleService {
   _extractLinksFromList($, listNode, baseUrl) {
     const items = [];
 
-    listNode.find("li a").each((_, a) => {
-      const $a = $(a);
-      const $li = $a.closest("li");
+    listNode.find("li").each((_, li) => {
+      const $li = $(li);
 
       // Skip items marked with blocked emojis
       if (ARTICLES_TO_SKIP.some((text) => $li.text().includes(text))) {
+        return;
+      }
+
+      const $a = this._findPrimaryLinkInListItem($, $li);
+      if (!$a || !$a.length) {
         return;
       }
 
@@ -199,6 +203,34 @@ class ArticleService {
     });
 
     return items;
+  }
+
+  /**
+   * Pick the primary article link from a newsletter list item.
+   * TWIR often includes secondary inline links like "docs" or "React.FC".
+   * @private
+   */
+  _findPrimaryLinkInListItem($, $li) {
+    const anchors = $li.find("a").toArray();
+    if (anchors.length === 0) return null;
+
+    let best = null;
+    let bestScore = -1;
+
+    for (const anchor of anchors) {
+      const $anchor = $(anchor);
+      const text = $anchor.text().trim();
+      const href = $anchor.attr("href");
+      if (!text || !href) continue;
+
+      const score = text.length;
+      if (score > bestScore) {
+        best = $anchor;
+        bestScore = score;
+      }
+    }
+
+    return best;
   }
 
   /**
@@ -266,6 +298,7 @@ class ArticleService {
   _parseReactSectionFromDom($, validatedUrl) {
     observability.incParseAttempt();
     const title = $("h1").first().text().trim() || "This Week In React";
+    const publishedDate = this._extractPublishedDate($);
     const reactHeading = this._ensureReactHeading($);
     const featured = this._extractFeatured($, reactHeading, validatedUrl);
     const items = this._extractItems($, reactHeading, validatedUrl);
@@ -274,9 +307,60 @@ class ArticleService {
     return {
       title,
       url: validatedUrl,
+      publishedDate,
       featured,
       items,
     };
+  }
+
+  /**
+   * Extract article publish date as YYYY-MM-DD.
+   * Priority: <time datetime> -> meta article:published_time -> JSON-LD datePublished
+   * @private
+   */
+  _extractPublishedDate($) {
+    const toIsoDate = (value) => {
+      if (!value || typeof value !== "string") return null;
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const date = new Date(trimmed);
+      if (Number.isNaN(date.getTime())) return null;
+      return date.toISOString().slice(0, 10);
+    };
+
+    const fromTime = toIsoDate($("time[datetime]").first().attr("datetime"));
+    if (fromTime) return fromTime;
+
+    const fromMeta = toIsoDate(
+      $('meta[property="article:published_time"]').attr("content")
+    );
+    if (fromMeta) return fromMeta;
+
+    let fromJsonLd = null;
+    $('script[type="application/ld+json"]').each((_, el) => {
+      if (fromJsonLd) return;
+      try {
+        const raw = $(el).html();
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          for (const entry of parsed) {
+            const extracted = toIsoDate(entry?.datePublished);
+            if (extracted) {
+              fromJsonLd = extracted;
+              return;
+            }
+          }
+          return;
+        }
+        fromJsonLd = toIsoDate(parsed?.datePublished);
+      } catch {
+        // ignore invalid JSON-LD blocks
+      }
+    });
+
+    if (fromJsonLd) return fromJsonLd;
+    return null;
   }
 
   /**

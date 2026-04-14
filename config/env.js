@@ -82,6 +82,25 @@ function validateEnv() {
       process.exit(1);
     }
   }
+
+  // Validate Obsidian vault path (optional, used by /obsidian command)
+  if (process.env.OBSIDIAN_VAULT_PATH !== undefined) {
+    const vaultPath = process.env.OBSIDIAN_VAULT_PATH.trim();
+    if (!vaultPath) {
+      console.error("❌ Invalid OBSIDIAN_VAULT_PATH. Path must be non-empty.");
+      process.exit(1);
+    }
+  }
+
+  if (process.env.OBSIDIAN_SCRAPER_MODE !== undefined) {
+    const mode = process.env.OBSIDIAN_SCRAPER_MODE.trim().toLowerCase();
+    if (!["hybrid", "python", "playwright", "fast"].includes(mode)) {
+      console.error(
+        '❌ Invalid OBSIDIAN_SCRAPER_MODE. Use one of: "hybrid", "python", "playwright", "fast".'
+      );
+      process.exit(1);
+    }
+  }
 }
 
 validateEnv();
@@ -112,5 +131,11 @@ module.exports = {
     process.env.HEALTH_PORT !== undefined ? Number(process.env.HEALTH_PORT) : 3001,
   CRON_TIMEZONE: process.env.CRON_TIMEZONE || "UTC",
   LOG_FORMAT: process.env.LOG_FORMAT || "json",
+  OBSIDIAN_VAULT_PATH: process.env.OBSIDIAN_VAULT_PATH
+    ? process.env.OBSIDIAN_VAULT_PATH.trim()
+    : "",
+  OBSIDIAN_SCRAPER_MODE: process.env.OBSIDIAN_SCRAPER_MODE
+    ? process.env.OBSIDIAN_SCRAPER_MODE.trim().toLowerCase()
+    : "hybrid",
   NODE_ENV: process.env.NODE_ENV || "development",
 };

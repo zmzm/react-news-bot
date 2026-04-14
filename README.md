@@ -7,6 +7,7 @@ A Telegram bot that automatically sends the React section from "This Week In Rea
 - 🤖 Automatic weekly updates every Thursday at 10:00 AM (to configured target chats)
 - 📰 Fetch any article by number (`/article <number>`)
 - 📚 Generate detailed article digests (`/digest <number>`) - AI-powered summaries with key takeaways
+- 🗒️ Generate Obsidian issue bundles (`/obsidian <number>`) - creates issue folder with `MOC.md` and per-item notes in `articles/`
 - 🔍 Search articles by keyword (`/search <query>`) - Fast keyword search across all indexed articles
 - 🔒 Security features (rate limiting, URL validation, SSRF protection)
 - 📈 Observability: JSON logs, runtime metrics, health endpoint, optional heartbeat
@@ -99,6 +100,7 @@ pnpm node:start
 - `/now` - Manually check for new articles (may require authorization)
 - `/article <number>` - Get a specific article by number (e.g., `/article 260`)
 - `/digest <number>` - Generate detailed AI-powered digest of React section with summaries, key takeaways, and recommendations (requires OpenAI API key)
+- `/obsidian <number> [--overwrite]` - Generate Obsidian bundle: `<vault>/TWIR/<issue>/MOC.md` + `<vault>/TWIR/<issue>/articles/*.md` (requires `OPENAI_API_KEY` and `OBSIDIAN_VAULT_PATH`)
 - `/search <query>` - Search articles by keyword across all indexed React articles (e.g., `/search hooks`)
   - Supports filters: `#262`, `issue:262`, `since:250`, `featured`, `type:item`, `limit:5`
 
@@ -153,6 +155,9 @@ thisweekinreact-bot/
 ### Optional
 
 - `OPENAI_API_KEY` - Your OpenAI API key (optional, required only for `/digest` command). Get one at https://platform.openai.com/api-keys
+- `OBSIDIAN_VAULT_PATH` - Absolute path to your Obsidian vault (optional, required for `/obsidian` command)
+- `OBSIDIAN_SCRAPER_MODE` - Obsidian article extraction mode: `hybrid` (default), `python`, `playwright`, or `fast`
+- `PYTHON_CLIPPER_BINARY` - Optional Python binary path for clipper worker (default: `.venv/bin/python` if present, else `python3`)
 - `ALLOWED_USER_IDS` - Comma-separated list of user IDs allowed to use bot commands. If empty, all users are allowed.
 - `TARGET_CHAT_IDS` - Comma-separated chat IDs for scheduled auto-delivery. If empty, scheduler checks for updates but does not auto-send.
 - `HEARTBEAT_CHAT_IDS` - Comma-separated chat IDs for periodic heartbeat messages (optional)
@@ -189,6 +194,26 @@ docker run --env-file .env -p 3001:3001 thisweekinreact-bot
 Container healthcheck uses the app's `/health` endpoint.
 
 ## Troubleshooting
+
+### Obsidian Clipper Quality
+
+For best page extraction quality, install Python clipper deps:
+
+```bash
+pip3 install requests readability-lxml markdownify beautifulsoup4 lxml
+```
+
+Optionally install Playwright Chromium as secondary fallback:
+
+```bash
+npx playwright install chromium
+```
+
+Then set:
+
+```env
+OBSIDIAN_SCRAPER_MODE=hybrid
+```
 
 ### Error fetching article
 

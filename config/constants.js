@@ -69,6 +69,13 @@ module.exports = {
       BACKOFF_MULTIPLIER: 2, // Exponential backoff multiplier
     },
 
+    // Obsidian notes generation
+    NOTES: {
+      MODEL: "gpt-4.1",
+      TEMPERATURE: 0.2,
+      MAX_TOKENS: 5000,
+    },
+
     // Pricing per 1K tokens (converted from fine-tuning prices per 1M tokens)
     // Note: These are fine-tuning prices converted to per-1K format
     // Format: { input: price_per_1k_tokens, output: price_per_1k_tokens }
@@ -77,6 +84,27 @@ module.exports = {
       "gpt-4.1-mini": { input: 0.0008, output: 0.0032 }, // $0.80/1M input, $3.20/1M output
       "gpt-4.1-nano": { input: 0.0002, output: 0.0008 }, // $0.20/1M input, $0.80/1M output
       "o4-mini": { input: 0.004, output: 0.016 }, // $4.00/1M input, $16.00/1M output
+    },
+  },
+
+  // Obsidian notes defaults and normalization
+  OBSIDIAN: {
+    DEFAULT_TYPE: "twir-issue",
+    DEFAULT_STATUS: "auto",
+    DEFAULT_TAGS: ["twir", "react", "digest"],
+    INDEX_NOTE_NAME: "This Week in React Index",
+    MAX_TLDR_ITEMS: 5,
+    MAX_TOPICS: 8,
+    MAX_ACTION_ITEMS: 8,
+    MAX_RELATED_NOTES: 16,
+    MAX_ITEM_NOTES_LENGTH: 1800,
+    CANONICAL_LINKS: {
+      "react compiler": "React Compiler",
+      rsc: "Server Components",
+      "server components": "Server Components",
+      nextjs: "Next.js",
+      vitejs: "Vite",
+      "tanstack query": "TanStack Query",
     },
   },
 };
