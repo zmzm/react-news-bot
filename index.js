@@ -10,7 +10,7 @@ const { registerCommands } = require("./handlers/commands");
 const errorHandler = require("./middleware/errorHandler");
 const { startScheduler } = require("./scheduler/cron");
 const { NODE_ENV } = require("./config/env");
-const { logStartup, logError } = require("./utils/logger");
+const { logStartup, logError, logInfo } = require("./utils/logger");
 
 // Detect environment
 const isDevelopment = NODE_ENV !== "production";
@@ -70,14 +70,19 @@ async function start() {
     // Log startup messages BEFORE launching bot to ensure they appear immediately
     logStartup({ isDevelopment, isBun, isNodemon });
 
+    // Start health endpoint early so runtime can be inspected even if bot launch is slow.
+    await opsService.startHealthServer();
+
     // Start scheduler BEFORE launching bot
     startScheduler();
 
+    logInfo("Launching Telegram bot...");
+
     // Launch bot AFTER logging messages
     await telegramService.launch();
+    logInfo("Telegram bot launched");
 
-    // Start ops endpoints/heartbeat after bot is online
-    await opsService.startHealthServer();
+    // Start heartbeat after bot is online
     opsService.startHeartbeat();
   } catch (err) {
     logError("Failed to launch bot:", err);

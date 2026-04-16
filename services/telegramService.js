@@ -1,10 +1,12 @@
 const { Telegraf } = require("telegraf");
 const { BOT_TOKEN } = require("../config/env");
+const { TELEGRAM_LAUNCH_TIMEOUT_MS } = require("../config/constants");
 const articleService = require("./articleService");
 const scraper = require("./scraper");
 const stateManager = require("../utils/stateManager");
 const observability = require("./observabilityService");
 const { logInfo, logError } = require("../utils/logger");
+const { NetworkError } = require("../utils/errors");
 
 /**
  * Telegram bot service
@@ -16,6 +18,30 @@ class TelegramService {
    */
   constructor() {
     this.bot = new Telegraf(BOT_TOKEN);
+    this.launchTask = null;
+  }
+
+  _withTimeout(promise, timeoutMs, operationName) {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(
+          new NetworkError(
+            `${operationName} timed out after ${timeoutMs}ms. Check Telegram API connectivity and BOT_TOKEN.`,
+            "TELEGRAM_TIMEOUT"
+          )
+        );
+      }, timeoutMs);
+
+      promise
+        .then((result) => {
+          clearTimeout(timer);
+          resolve(result);
+        })
+        .catch((err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
+    });
   }
 
   /**
@@ -156,8 +182,45 @@ class TelegramService {
    * Launch the bot
    */
   async launch() {
-    // bot.launch() is async but doesn't block, so we wait a bit to ensure it's ready
-    await this.bot.launch();
+    if (this.launchTask) {
+      logInfo("Telegram launch: bot is already running");
+      return;
+    }
+
+    const timeoutMs = TELEGRAM_LAUNCH_TIMEOUT_MS;
+
+    // Verify basic Telegram API access first to separate network/token failures from long polling start.
+    logInfo(`Telegram preflight: calling getMe() with timeout ${timeoutMs}ms`);
+    await this._withTimeout(this.bot.telegram.getMe(), timeoutMs, "Telegram getMe()");
+    logInfo("Telegram preflight: getMe() succeeded");
+
+    logInfo(`Telegram launch: starting long polling (startup timeout ${timeoutMs}ms)`);
+    let markStarted;
+    let markStartupFailed;
+    const startupSignal = new Promise((resolve, reject) => {
+      markStarted = resolve;
+      markStartupFailed = reject;
+    });
+
+    const launchPromise = this.bot.launch({}, () => {
+      logInfo("Telegram launch: long polling started");
+      markStarted();
+    });
+
+    launchPromise.catch((err) => {
+      markStartupFailed(err);
+    });
+
+    this.launchTask = launchPromise
+      .catch((err) => {
+        logError("Telegram polling stopped with error:", err);
+      })
+      .finally(() => {
+        this.launchTask = null;
+      });
+
+    await this._withTimeout(startupSignal, timeoutMs, "Telegram launch startup");
+
     // Small delay to ensure bot is fully initialized
     await new Promise((resolve) => setTimeout(resolve, 100));
   }

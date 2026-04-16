@@ -13,6 +13,7 @@ module.exports = {
   // HTTP client configuration
   HTTP_TIMEOUT: 10000, // 10 seconds
   MAX_RESPONSE_SIZE: 5 * 1024 * 1024, // 5MB
+  TELEGRAM_LAUNCH_TIMEOUT_MS: 20000, // 20 seconds
 
   // URL validation
   ALLOWED_DOMAINS: ["thisweekinreact.com"],
