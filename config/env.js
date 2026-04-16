@@ -128,7 +128,7 @@ module.exports = {
     : 0,
   HEALTH_HOST: process.env.HEALTH_HOST || "0.0.0.0",
   HEALTH_PORT:
-    process.env.HEALTH_PORT !== undefined ? Number(process.env.HEALTH_PORT) : 3001,
+    process.env.HEALTH_PORT !== undefined ? Number(process.env.HEALTH_PORT) : 5001,
   CRON_TIMEZONE: process.env.CRON_TIMEZONE || "UTC",
   LOG_FORMAT: process.env.LOG_FORMAT || "json",
   OBSIDIAN_VAULT_PATH: process.env.OBSIDIAN_VAULT_PATH

@@ -1,0 +1,5 @@
+requests
+readability-lxml
+markdownify
+beautifulsoup4
+lxml

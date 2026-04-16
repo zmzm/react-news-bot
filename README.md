@@ -160,7 +160,7 @@ thisweekinreact-bot/
 - `HEARTBEAT_INTERVAL_MINUTES` - Heartbeat cadence in minutes; `0` disables (default: `0`)
 - `CRON_TIMEZONE` - IANA timezone for scheduler (default: `UTC`, example: `America/New_York`)
 - `HEALTH_HOST` - Health endpoint bind host (default: `0.0.0.0`)
-- `HEALTH_PORT` - Health endpoint port (default: `3001`, set `0` to disable)
+- `HEALTH_PORT` - Health endpoint port (default: `5001`, set `0` to disable)
 - `LOG_FORMAT` - `json` or `text` logs (default: `json`)
 - `NODE_ENV` - Set to `production` for production mode (default: `development`)
 
@@ -184,7 +184,7 @@ docker build -t thisweekinreact-bot .
 Run container:
 
 ```bash
-docker run --env-file .env -p 3001:3001 thisweekinreact-bot
+docker run --env-file .env -p 5001:5001 thisweekinreact-bot
 ```
 
 Container healthcheck uses the app's `/health` endpoint.
