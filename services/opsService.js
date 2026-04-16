@@ -1,6 +1,5 @@
 const http = require("http");
 const observability = require("./observabilityService");
-const searchService = require("./searchService");
 const stateManager = require("../utils/stateManager");
 const {
   HEALTH_HOST,
@@ -30,10 +29,6 @@ class OpsService {
       timestamp: new Date().toISOString(),
       scheduler: getSchedulerStatus(),
       state,
-      index: {
-        articleCount: searchService.getArticleCount(),
-        latestIssue: searchService.getLatestIssue(),
-      },
       metrics: observability.getSnapshot(),
     };
   }
@@ -92,7 +87,6 @@ class OpsService {
         `Time: ${payload.timestamp}`,
         `Status: ${payload.status}`,
         `Last issue: #${payload.state.lastArticle}`,
-        `Index count: ${payload.index.articleCount}`,
         `Parse success rate: ${(payload.metrics.parse_success_rate * 100).toFixed(1)}%`,
         `Avg digest duration: ${Math.round(payload.metrics.digest_duration_ms_avg)}ms`,
         `Send failures: ${payload.metrics.send_failures_total}`,

@@ -1,6 +1,5 @@
 const telegramService = require("../services/telegramService");
 const articleService = require("../services/articleService");
-const searchService = require("../services/searchService");
 const digestCacheService = require("../services/digestCacheService");
 const observability = require("../services/observabilityService");
 const stateManager = require("../utils/stateManager");
@@ -10,7 +9,6 @@ const rateLimitMiddleware = require("../middleware/rateLimit");
 const {
   validateArticleNumber,
   parseCommandArgs,
-  parseSearchQuery,
 } = require("../utils/validators");
 const { OPENAI_API_KEY, NODE_ENV, OBSIDIAN_VAULT_PATH } = require("../config/env");
 const { calculateCost } = require("../utils/openaiSecurity");
@@ -153,20 +151,6 @@ async function createProgressUpdater(ctx, initialText) {
   };
 }
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function highlightText(text, query) {
-  if (!query) return text;
-  let output = text;
-  for (const term of query.split(/\s+/).filter((t) => t.length > 1)) {
-    const re = new RegExp(`(${escapeRegExp(term)})`, "ig");
-    output = output.replace(re, "[$1]");
-  }
-  return output;
-}
-
 /**
  * Register all bot commands with their middleware and handlers
  *
@@ -178,7 +162,6 @@ function highlightText(text, query) {
  * - /article <number> - Fetch specific article (rate limit)
  * - /digest <number> - Generate detailed AI digest of React section (rate limit)
  * - /obsidian <number> [--overwrite] - Generate Obsidian bundle (MOC + articles) and save to vault (rate limit)
- * - /search <query> - Search articles by keyword (rate limit)
  */
 function registerCommands() {
   const bot = telegramService.getBot();
@@ -197,12 +180,6 @@ function registerCommands() {
     const { data: reactSectionData } = await articleService.getArticleWithData(
       articleNumber
     );
-
-    try {
-      await searchService.indexArticles(reactSectionData);
-    } catch (indexErr) {
-      logError("Failed to index articles:", indexErr.message);
-    }
 
     const totalArticles =
       (reactSectionData.featured ? 1 : 0) +
@@ -257,12 +234,11 @@ function registerCommands() {
       "",
       "/start - Check if bot is alive",
       "/help - Show this help message",
-      "/status - Show bot, scheduler and index status",
+      "/status - Show bot and scheduler status",
       "/now - Manually check latest issue (authorized users)",
       "/article <number> - Send React section of specific issue",
       "/digest <number> - Generate AI digest for issue",
       "/obsidian <number> [--overwrite] - Generate MOC + article notes in Obsidian",
-      '/search <query> - Search indexed titles (example: /search hooks)',
     ].join("\n");
 
     await ctx.reply(helpText);
@@ -270,19 +246,9 @@ function registerCommands() {
 
   bot.command("status", rateLimitMiddleware(), async (ctx) => {
     if (await rejectIfUnauthorized(ctx)) return;
-    console.log(ctx.message.chat.id)
     try {
       const state = await stateManager.load();
       const schedulerStatus = getSchedulerStatus();
-
-      let articleCount = 0;
-      let latestIndexedIssue = null;
-      try {
-        articleCount = searchService.getArticleCount();
-        latestIndexedIssue = searchService.getLatestIssue();
-      } catch (searchErr) {
-        logError("Search stats are unavailable:", searchErr.message);
-      }
 
       const nextRun = schedulerStatus.nextRunAt
         ? new Date(schedulerStatus.nextRunAt).toISOString()
@@ -298,8 +264,6 @@ function registerCommands() {
         "",
         `OpenAI digest: ${OPENAI_API_KEY ? "enabled" : "disabled"}`,
         `State lastArticle: #${state.lastArticle}`,
-        `Search index count: ${articleCount}`,
-        `Search latest issue: ${latestIndexedIssue || "n/a"}`,
         `Scheduler status: ${schedulerStatus.status}`,
         `Scheduler timezone: ${schedulerStatus.timezone}`,
         `Scheduler next run (ISO): ${nextRun}`,
@@ -352,14 +316,9 @@ function registerCommands() {
       const articleNumber = validation.value;
 
       await ctx.reply(`Fetching article #${articleNumber}, please wait…`);
-      const { text: messageTextResult, data: reactSectionData } =
-        await articleService.getArticleWithData(articleNumber);
-
-      try {
-        await searchService.indexArticles(reactSectionData);
-      } catch (indexErr) {
-        logError("Failed to index articles:", indexErr.message);
-      }
+      const { text: messageTextResult } = await articleService.getArticleWithData(
+        articleNumber
+      );
 
       await ctx.reply(messageTextResult, {
         disable_web_page_preview: false,
@@ -411,12 +370,6 @@ function registerCommands() {
       const { data: reactSectionData } = await articleService.getArticleWithData(
         articleNumber
       );
-
-      try {
-        await searchService.indexArticles(reactSectionData);
-      } catch (indexErr) {
-        logError("Failed to index articles:", indexErr.message);
-      }
 
       const totalArticles =
         (reactSectionData.featured ? 1 : 0) +
@@ -557,83 +510,6 @@ function registerCommands() {
     } catch (err) {
       logError(`Error generating Obsidian note for article #${articleNumber}:`, err);
       await ctx.reply(`❌ ${err.message || "Failed to generate Obsidian note."}`);
-    }
-  });
-
-  bot.command("search", rateLimitMiddleware(), async (ctx) => {
-    if (await rejectIfUnauthorized(ctx)) return;
-    try {
-      const messageText = ctx.message?.text || "";
-      const args = parseCommandArgs(messageText);
-
-      if (args.length < 1) {
-        await ctx.reply(
-          "Usage: /search <query|filters>\n\nExamples:\n/search hooks\n/search #262\n/search hooks featured limit:5\n/search state since:250 type:item"
-        );
-        return;
-      }
-
-      const rawQuery = args.join(" ").trim();
-      const parsed = parseSearchQuery(rawQuery);
-      if (!parsed.valid) {
-        await ctx.reply(`❌ ${parsed.error}`);
-        return;
-      }
-
-      const { query, issueNumber, sinceIssue, type, limit } = parsed.filters;
-
-      await ctx.reply(`🔍 Searching (${rawQuery})...`);
-
-      const results = await searchService.search(query, {
-        issueNumber,
-        sinceIssue,
-        type,
-        limit,
-      });
-
-      if (results.length === 0) {
-        await ctx.reply(
-          `❌ No articles found for "${rawQuery}".\n\nTry a different query or relax filters.`
-        );
-        return;
-      }
-
-      const activeFilters = [];
-      if (issueNumber) activeFilters.push(`#${issueNumber}`);
-      if (sinceIssue) activeFilters.push(`since:${sinceIssue}`);
-      if (type) activeFilters.push(`type:${type}`);
-      activeFilters.push(`limit:${limit}`);
-
-      let response = `📚 Found ${results.length} article(s)\n`;
-      response += `Query: ${query || "(filter-only)"}\n`;
-      response += `Filters: ${activeFilters.join(", ")}\n\n`;
-
-      for (let i = 0; i < results.length; i++) {
-        const result = results[i];
-        const typeIcon = result.type === "featured" ? "⭐" : "📄";
-        const scoreEmoji =
-          result.score >= 70 ? "🟢" : result.score >= 40 ? "🟡" : "⚪";
-        const title = highlightText(result.title, query);
-
-        response += `${i + 1}. ${typeIcon} ${title}\n`;
-        response += `   Issue #${result.issueNumber} | Score: ${scoreEmoji} ${Math.round(
-          result.score
-        )}%\n`;
-        response += `   ${result.url}\n\n`;
-
-        if (response.length > 3500 && i < results.length - 1) {
-          await ctx.reply(response);
-          response = `📚 (continued):\n\n`;
-        }
-      }
-
-      await ctx.reply(response.trim());
-    } catch (err) {
-      logError("Error in /search command:", err);
-
-      const errorMessage =
-        err.message || "Failed to search articles. Please try again.";
-      await ctx.reply(`❌ ${errorMessage}`);
     }
   });
 }

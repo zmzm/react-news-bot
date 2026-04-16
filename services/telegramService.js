@@ -1,7 +1,6 @@
 const { Telegraf } = require("telegraf");
 const { BOT_TOKEN } = require("../config/env");
 const articleService = require("./articleService");
-const searchService = require("./searchService");
 const scraper = require("./scraper");
 const stateManager = require("../utils/stateManager");
 const observability = require("./observabilityService");
@@ -99,15 +98,9 @@ class TelegramService {
         `Found new article #${currentArticleNumber}, parsing React...`
       );
 
-      const { text, data: reactSectionData } = await articleService.getArticleWithData(currentArticleNumber);
-
-      // Index articles for search (non-blocking, don't fail if it errors)
-      try {
-        await searchService.indexArticles(reactSectionData);
-      } catch (indexErr) {
-        // Don't fail the whole operation if indexing fails
-        logError("Failed to index articles:", indexErr);
-      }
+      const { text, data: reactSectionData } = await articleService.getArticleWithData(
+        currentArticleNumber
+      );
 
       // If context provided, send the message
       if (ctx) {
@@ -134,7 +127,12 @@ class TelegramService {
 
       logInfo(`Processed article #${currentArticleNumber}`);
 
-      return { found: true, text, articleNumber: currentArticleNumber };
+      return {
+        found: true,
+        text,
+        articleNumber: currentArticleNumber,
+        reactSectionData,
+      };
     } catch (err) {
       logError("Error in checkAndSend:", err);
 

@@ -38,17 +38,16 @@ No test suite exists. The test-article script is the primary way to verify scrap
   - `articleService.js` — **Most fragile file.** Extracts React section from newsletter HTML using multiple fallback strategies (h2 text match → emoji match → any heading). When scraping breaks, this is where selectors need updating.
   - `telegramService.js` — Bot lifecycle, message sending, `checkAndSend()` for scheduled checks
   - `openaiService.js` — AI digest generation with retry/backoff, token tracking
-  - `searchService.js` — SQLite FTS5 search. Auto-detects Bun native SQLite vs better-sqlite3
-- `handlers/commands.js` — All bot commands: `/start`, `/now` (admin), `/article <n>`, `/digest <n>`, `/search <query>`
+- `handlers/commands.js` — All bot commands: `/start`, `/now` (admin), `/article <n>`, `/digest <n>`, `/obsidian <n>`
 - `middleware/` — `rateLimit.js` (factory), `auth.js` (checks ALLOWED_USER_IDS), `errorHandler.js`
 - `utils/` — Custom error classes (`errors.js`), URL validation with SSRF protection (`urlValidator.js`), input validation (`validators.js`), atomic state persistence (`stateManager.js`)
 - `state.json` — Tracks `lastArticle` number to detect new issues on scheduled runs
 
 ## Data Flow
 
-Scheduled check (Thursday 10:00): cron → `telegramService.checkAndSend()` → scraper gets latest URL → compares article number with `state.json` → if new: `articleService` parses React section → indexes in search DB → sends message → updates state.
+Scheduled check (Thursday 10:00): cron → `telegramService.checkAndSend()` → scraper gets latest URL → compares article number with `state.json` → if new: `articleService` parses React section → sends message → updates state.
 
-Manual `/article N`: rate limit middleware → validate input → `articleService.getArticle(N)` → index → reply.
+Manual `/article N`: rate limit middleware → validate input → `articleService.getArticle(N)` → reply.
 
 ## Key Conventions
 

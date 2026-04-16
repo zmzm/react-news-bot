@@ -7,7 +7,12 @@ const {
   SCHEDULER_LOCK_FILE,
   SCHEDULER_LOCK_TTL_MS,
 } = require("../config/constants");
-const { TARGET_CHAT_IDS, CRON_TIMEZONE } = require("../config/env");
+const {
+  TARGET_CHAT_IDS,
+  CRON_TIMEZONE,
+  OPENAI_API_KEY,
+  OBSIDIAN_VAULT_PATH,
+} = require("../config/env");
 const telegramService = require("../services/telegramService");
 const { logInfo, logError } = require("../utils/logger");
 
@@ -110,6 +115,37 @@ function getSchedulerStatus() {
   };
 }
 
+async function runScheduledObsidian(articleNumber, reactSectionData) {
+  if (!OBSIDIAN_VAULT_PATH) {
+    logInfo(
+      `CRON: Obsidian save skipped for #${articleNumber} (OBSIDIAN_VAULT_PATH is not configured).`
+    );
+    return { skipped: true };
+  }
+
+  const obsidianService = require("../services/obsidianService");
+  let payload;
+
+  if (OPENAI_API_KEY) {
+    const openaiService = require("../services/openaiService");
+    const digestPayload = await openaiService.generateIssueNotes(reactSectionData);
+    payload = await obsidianService.enrichIssueNotesWithFullContent(digestPayload);
+  } else {
+    payload = await obsidianService.generateIssueNotesFromReactSection(reactSectionData);
+  }
+
+  const saveResult = await obsidianService.saveIssueBundle(
+    OBSIDIAN_VAULT_PATH,
+    payload,
+    { overwrite: true }
+  );
+
+  logInfo(
+    `CRON: Obsidian bundle saved for issue #${articleNumber}: ${saveResult.mocPath}`
+  );
+  return { skipped: false, saveResult };
+}
+
 /**
  * Initialize and start cron jobs
  * Schedules weekly article check (Thursday at 10:00)
@@ -158,7 +194,16 @@ function startScheduler() {
         }
 
         logInfo("CRON: Thursday, checking for new article...");
-        await telegramService.checkAndSend(null, TARGET_CHAT_IDS);
+        const checkResult = await telegramService.checkAndSend(
+          null,
+          TARGET_CHAT_IDS
+        );
+        if (checkResult?.found && checkResult.articleNumber && checkResult.reactSectionData) {
+          await runScheduledObsidian(
+            checkResult.articleNumber,
+            checkResult.reactSectionData
+          );
+        }
         lastRun = {
           ...lastRun,
           finishedAt: new Date().toISOString(),

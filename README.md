@@ -8,7 +8,6 @@ A Telegram bot that automatically sends the React section from "This Week In Rea
 - 📰 Fetch any article by number (`/article <number>`)
 - 📚 Generate detailed article digests (`/digest <number>`) - AI-powered summaries with key takeaways
 - 🗒️ Generate Obsidian issue bundles (`/obsidian <number>`) - creates issue folder with `MOC.md` and per-item notes in `articles/`
-- 🔍 Search articles by keyword (`/search <query>`) - Fast keyword search across all indexed articles
 - 🔒 Security features (rate limiting, URL validation, SSRF protection)
 - 📈 Observability: JSON logs, runtime metrics, health endpoint, optional heartbeat
 - 🔄 Hot reload for development (Bun watch mode or nodemon)
@@ -95,14 +94,11 @@ pnpm node:start
 
 - `/start` - Check if the bot is alive
 - `/help` - Show available commands
-- `/status` - Show operational status (scheduler/index/state)
-- `/status` - Show operational status (scheduler/index/state/metrics)
+- `/status` - Show operational status (scheduler/state/metrics)
 - `/now` - Manually check for new articles (may require authorization)
 - `/article <number>` - Get a specific article by number (e.g., `/article 260`)
 - `/digest <number>` - Generate detailed AI-powered digest of React section with summaries, key takeaways, and recommendations (requires OpenAI API key)
 - `/obsidian <number> [--overwrite]` - Generate Obsidian bundle: `<vault>/TWIR/<issue>/MOC.md` + `<vault>/TWIR/<issue>/articles/*.md` (requires `OPENAI_API_KEY` and `OBSIDIAN_VAULT_PATH`)
-- `/search <query>` - Search articles by keyword across all indexed React articles (e.g., `/search hooks`)
-  - Supports filters: `#262`, `issue:262`, `since:250`, `featured`, `type:item`, `limit:5`
 
 ## Development
 
@@ -129,11 +125,11 @@ thisweekinreact-bot/
 ├── config/          # Configuration (env, constants)
 ├── handlers/        # Bot command handlers
 ├── middleware/      # Bot middleware (auth, rate limit, errors)
-├── services/        # Business logic (scraper, articles, telegram, search)
+├── services/        # Business logic (scraper, articles, telegram, AI/obsidian)
 ├── utils/           # Utilities (validators, errors, logger, etc.)
 ├── scheduler/       # Cron jobs
 ├── scripts/         # Utility scripts
-├── data/            # Data storage (search database)
+├── data/            # Data storage (digest cache, scheduler lock)
 └── docs/            # Documentation
 ```
 
@@ -234,16 +230,6 @@ This will show you:
 - What headings are available in the article
 - Why the React section might not be found
 
-### Search Index
-
-The `/search` command uses a SQLite database with FTS5 for fast keyword search. Articles are automatically indexed when:
-- New articles are found via the weekly cron job
-- Articles are manually checked via `/now` command
-
-To build the search index for existing articles, you can manually fetch articles using `/article <number>` or wait for the automatic indexing when new articles arrive.
-
-The search database is stored in `data/search.db` and is automatically created on first use.
-
 ### Digest Cache
 
 The `/digest` command caches generated digests by issue and model in `data/digest-cache.json`.  
@@ -255,7 +241,6 @@ Repeated requests for the same issue return cached output to reduce latency and 
 2. **"Article not found (404)"** - The article number doesn't exist
 3. **Network errors** - Check your internet connection or the site might be down
 4. **Rate limit errors** - You've exceeded the rate limit (3 requests per 5 minutes). Wait a few minutes and try again.
-5. **"No articles found" in search** - The search index might be empty. Try fetching some articles first using `/article <number>` to build the index.
 
 ### Error Handling
 

@@ -3,7 +3,6 @@ const path = require("path");
 module.exports = {
   // File paths
   STATE_FILE: path.join(__dirname, "..", "state.json"),
-  SEARCH_DB_PATH: path.join(__dirname, "..", "data", "search.db"),
   DIGEST_CACHE_FILE: path.join(__dirname, "..", "data", "digest-cache.json"),
   SCHEDULER_LOCK_FILE: path.join(__dirname, "..", "data", "scheduler.lock"),
 
