@@ -1,0 +1,9 @@
+services:
+  react-news-bot:
+    build: .
+    container_name: react-news-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "5001:5001"
