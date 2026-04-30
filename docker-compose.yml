@@ -7,3 +7,5 @@ services:
       - .env
     ports:
       - "5001:5001"
+    volumes:
+      - /home/pentagon-admin/Documents/apps/obsidian-vaults/frontend/raw/twir:/app/data

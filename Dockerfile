@@ -20,6 +20,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY --chown=node:node . .
+RUN chown -R node:node /app
 
 EXPOSE 5001
 
